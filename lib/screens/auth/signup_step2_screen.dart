@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -293,13 +294,21 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                   children: [
                     Row(
                       children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back_ios),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            padding: const EdgeInsets.all(12),
-                          ),
+                        Consumer<ThemeNotifier>(
+                          builder: (context, themeNotifier, _) {
+                            final isDarkMode = themeNotifier.isDarkMode;
+                            return IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: Icon(
+                                Icons.arrow_back_ios,
+                                color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+                                padding: const EdgeInsets.all(12),
+                              ),
+                            );
+                          },
                         ),
                         const Spacer(),
                         // Progress Indicator
@@ -745,15 +754,17 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     String? Function(String?)? validator,
     VoidCallback? onTap,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -763,11 +774,13 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             absorbing: onTap != null,
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: isDarkMode 
+                        ? Colors.black.withOpacity(0.3) 
+                        : Colors.black.withOpacity(0.05),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -782,15 +795,21 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                 inputFormatters: inputFormatters,
                 validator: validator,
                 onTap: onTap,
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                ),
                 decoration: InputDecoration(
                   hintText: hint,
+                  hintStyle: TextStyle(
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                  ),
                   prefixIcon: Icon(icon, color: AppTheme.primaryColor),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: maxLines > 1 ? 16 : 14,
@@ -841,13 +860,17 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   }
 
   Widget _buildPickerSheet(String title, List<String> items, String selected) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: isDarkMode 
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.1),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),
@@ -861,17 +884,17 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: isDarkMode ? Colors.white24 : Colors.grey[300],
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
+              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
             ),
           ),
           const SizedBox(height: 20),
@@ -888,7 +911,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                     style: TextStyle(
                       color: isSelected
                           ? AppTheme.primaryColor
-                          : AppTheme.textPrimary,
+                          : isDarkMode
+                              ? Colors.white
+                              : AppTheme.textPrimary,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import 'signup_step2_screen.dart';
 import '../../widgets/otp_verification_dialog.dart';
@@ -118,13 +119,21 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     Row(
                       children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.arrow_back_ios),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            padding: const EdgeInsets.all(12),
-                          ),
+                        Consumer<ThemeNotifier>(
+                          builder: (context, themeNotifier, _) {
+                            final isDarkMode = themeNotifier.isDarkMode;
+                            return IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: Icon(
+                                Icons.arrow_back_ios,
+                                color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+                                padding: const EdgeInsets.all(12),
+                              ),
+                            );
+                          },
                         ),
                         const Spacer(),
                         // Progress Indicator
@@ -352,14 +361,16 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Widget _buildProgressIndicator(int current, int total) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       children: [
         Text(
           'Step $current of $total',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textSecondary,
+            color: isDarkMode ? Colors.white70 : AppTheme.textSecondary,
           ),
         ),
         const SizedBox(width: 12),
@@ -372,7 +383,9 @@ class _SignupScreenState extends State<SignupScreen> {
             decoration: BoxDecoration(
               color: index < current
                   ? AppTheme.primaryColor
-                  : AppTheme.textSecondary.withOpacity(0.2),
+                  : isDarkMode 
+                      ? Colors.white24 
+                      : AppTheme.textSecondary.withOpacity(0.2),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -383,6 +396,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildUserTypeCard(String title, IconData icon, String type) {
     final isSelected = _userType == type;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: () => setState(() => _userType = type),
       child: AnimatedContainer(
@@ -390,19 +405,27 @@ class _SignupScreenState extends State<SignupScreen> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: isSelected ? AppTheme.primaryGradient : null,
-          color: isSelected ? null : Colors.white,
+          color: isSelected 
+              ? null 
+              : isDarkMode 
+                  ? AppTheme.darkCardColor 
+                  : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? Colors.transparent
-                : AppTheme.textSecondary.withOpacity(0.2),
+                : isDarkMode 
+                    ? Colors.white24 
+                    : AppTheme.textSecondary.withOpacity(0.2),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
               color: isSelected
                   ? AppTheme.primaryColor.withOpacity(0.3)
-                  : Colors.black.withOpacity(0.05),
+                  : isDarkMode 
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.05),
               blurRadius: isSelected ? 12 : 10,
               offset: Offset(0, isSelected ? 6 : 4),
             ),
@@ -413,7 +436,11 @@ class _SignupScreenState extends State<SignupScreen> {
             Icon(
               icon,
               size: 40,
-              color: isSelected ? Colors.white : AppTheme.primaryColor,
+              color: isSelected 
+                  ? Colors.white 
+                  : isDarkMode 
+                      ? Colors.white70 
+                      : AppTheme.primaryColor,
             ),
             const SizedBox(height: 12),
             Text(
@@ -422,7 +449,11 @@ class _SignupScreenState extends State<SignupScreen> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : AppTheme.textPrimary,
+                color: isSelected 
+                    ? Colors.white 
+                    : isDarkMode 
+                        ? Colors.white70 
+                        : AppTheme.textPrimary,
               ),
             ),
           ],
@@ -441,25 +472,29 @@ class _SignupScreenState extends State<SignupScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: isDarkMode 
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -470,8 +505,14 @@ class _SignupScreenState extends State<SignupScreen> {
             obscureText: obscureText,
             keyboardType: keyboardType,
             validator: validator,
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+            ),
             decoration: InputDecoration(
               hintText: hint,
+              hintStyle: TextStyle(
+                color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+              ),
               prefixIcon: Icon(icon, color: AppTheme.primaryColor),
               suffixIcon: suffixIcon,
               border: OutlineInputBorder(
@@ -479,7 +520,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 16,

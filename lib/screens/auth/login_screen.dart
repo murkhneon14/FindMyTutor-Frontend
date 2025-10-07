@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -114,13 +115,21 @@ class _LoginScreenState extends State<LoginScreen> {
               // Back Button
               Align(
                 alignment: Alignment.centerLeft,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_ios),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.all(12),
-                  ),
+                child: Consumer<ThemeNotifier>(
+                  builder: (context, themeNotifier, _) {
+                    final isDarkMode = themeNotifier.isDarkMode;
+                    return IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.arrow_back_ios,
+                        color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 20),
@@ -318,25 +327,29 @@ class _LoginScreenState extends State<LoginScreen> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: isDarkMode 
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -347,8 +360,14 @@ class _LoginScreenState extends State<LoginScreen> {
             obscureText: obscureText,
             keyboardType: keyboardType,
             validator: validator,
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+            ),
             decoration: InputDecoration(
               hintText: hint,
+              hintStyle: TextStyle(
+                color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+              ),
               prefixIcon: Icon(icon, color: AppTheme.primaryColor),
               suffixIcon: suffixIcon,
               border: OutlineInputBorder(
@@ -356,7 +375,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 16,
