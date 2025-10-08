@@ -118,6 +118,54 @@ class _AccountScreenState extends State<AccountScreen> {
     return token != null && token.isNotEmpty;
   }
 
+  void _showProfileDetails(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isLandscape = mediaQuery.orientation == Orientation.landscape;
+    final height = isLandscape
+        ? 0.8
+        : 0.7; // Use 80% height in landscape, 70% in portrait
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: mediaQuery.size.height * height,
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Column(
+          children: [
+            // Draggable handle
+            Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 4),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Main content
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+                child: ProfileDetailsScreen(user: _user),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildProfileView() {
     return Scaffold(
       body: SafeArea(
@@ -142,87 +190,81 @@ class _AccountScreenState extends State<AccountScreen> {
             const SizedBox(height: 30),
             // Profile Card (tappable)
             InkWell(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ProfileDetailsScreen(user: _user),
-                  ),
-                );
-              },
+              onTap: () => _showProfileDetails(context),
               child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(color: Colors.white, width: 3),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primaryColor.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
                     ),
-                    child: const Icon(
-                      Icons.person,
-                      size: 40,
-                      color: AppTheme.primaryColor,
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: Colors.white, width: 3),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        size: 40,
+                        color: AppTheme.primaryColor,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_loading)
-                          const SizedBox(
-                            height: 22,
-                            child: LinearProgressIndicator(
-                              backgroundColor: Colors.white24,
-                              color: Colors.white,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_loading)
+                            const SizedBox(
+                              height: 22,
+                              child: LinearProgressIndicator(
+                                backgroundColor: Colors.white24,
+                                color: Colors.white,
+                              ),
+                            )
+                          else
+                            Text(
+                              (_user != null
+                                  ? (_user!['name'] as String? ?? 'User')
+                                  : 'User'),
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          )
-                        else
+                          const SizedBox(height: 4),
                           Text(
                             (_user != null
-                                ? (_user!['name'] as String? ?? 'User')
-                                : 'User'),
+                                ? (_user!['email'] as String? ?? '')
+                                : ''),
                             style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              fontSize: 14,
+                              color: Colors.white70,
                             ),
                           ),
-                        const SizedBox(height: 4),
-                        Text(
-                          (_user != null
-                              ? (_user!['email'] as String? ?? '')
-                              : ''),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ],
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ],
+                ),
               ),
-            ),
             ),
             const SizedBox(height: 30),
             // Profile Completion Status
@@ -286,7 +328,9 @@ class _AccountScreenState extends State<AccountScreen> {
                         final isDarkMode = themeNotifier.isDarkMode;
                         return Icon(
                           isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                          color: isDarkMode ? Colors.amber : Theme.of(context).primaryColor,
+                          color: isDarkMode
+                              ? Colors.amber
+                              : Theme.of(context).primaryColor,
                           size: 24,
                         );
                       },
