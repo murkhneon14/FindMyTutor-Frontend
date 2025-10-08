@@ -7,6 +7,7 @@ import '../../config/theme.dart' show ThemeNotifier, AppTheme;
 import '../../config/api.dart';
 import '../auth/auth_choice_screen.dart';
 import 'main_navigation.dart';
+import 'profile_details_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -139,8 +140,16 @@ class _AccountScreenState extends State<AccountScreen> {
               ],
             ),
             const SizedBox(height: 30),
-            // Profile Card
-            Container(
+            // Profile Card (tappable)
+            InkWell(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ProfileDetailsScreen(user: _user),
+                  ),
+                );
+              },
+              child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: AppTheme.primaryGradient,
@@ -213,6 +222,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ],
               ),
+            ),
             ),
             const SizedBox(height: 30),
             // Profile Completion Status
