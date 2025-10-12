@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -6,6 +7,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/api.dart';
+import '../../services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class SignupStep2Screen extends StatefulWidget {
   final String name;
@@ -40,6 +43,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   bool _isTeacher = false;
   String? _selectedGender;
   DateTime? _selectedDob;
+  Position? _currentLocation;
+  bool _isLoadingLocation = false;
+  String? _locationError;
   final List<String> _subjects = [
     'Mathematics',
     'Science',
@@ -74,6 +80,10 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   void initState() {
     super.initState();
     _isTeacher = widget.userType == 'teacher';
+    // Get location for teachers automatically
+    if (_isTeacher) {
+      _getCurrentLocation();
+    }
   }
 
   @override
@@ -199,8 +209,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             'subjects': [_subjectController.text.trim()],
             'fees': 0,
             'timings': 'flexible',
-            'latitude': 28.6139, // Delhi latitude for testing
-            'longitude': 77.2090, // Delhi longitude for testing
+            'latitude': _currentLocation?.latitude ?? 28.6139, // Delhi latitude for testing
+            'longitude': _currentLocation?.longitude ?? 77.2090, // Delhi longitude for testing
             'documents': [],
           };
           
@@ -268,6 +278,52 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
       if (map is Map && map['message'] is String) return map['message'] as String;
     } catch (_) {}
     return null;
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+      _locationError = null;
+    });
+
+    try {
+      final position = await LocationService.getCurrentLocation();
+      if (position != null) {
+        setState(() {
+          _currentLocation = position;
+          _isLoadingLocation = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Location obtained: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+              backgroundColor: AppTheme.successColor,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _isLoadingLocation = false;
+          _locationError = 'Unable to get location';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingLocation = false;
+        _locationError = e.toString();
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Location error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -504,6 +560,101 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                 }
                                 return null;
                               },
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            // Location Section for Teachers
+                            Text(
+                              'Location',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _currentLocation != null 
+                                      ? AppTheme.successColor.withOpacity(0.3)
+                                      : Colors.grey.withOpacity(0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _currentLocation != null 
+                                            ? Icons.location_on 
+                                            : Icons.location_off,
+                                        color: _currentLocation != null 
+                                            ? AppTheme.successColor 
+                                            : Colors.grey,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _currentLocation != null
+                                                  ? 'Location Obtained'
+                                                  : _locationError ?? 'Location Required',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: _currentLocation != null 
+                                                    ? AppTheme.successColor 
+                                                    : Colors.grey[700],
+                                              ),
+                                            ),
+                                            if (_currentLocation != null)
+                                              Text(
+                                                'Lat: ${_currentLocation!.latitude.toStringAsFixed(4)}, Lon: ${_currentLocation!.longitude.toStringAsFixed(4)}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (_isLoadingLocation)
+                                        const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      else
+                                        IconButton(
+                                          icon: const Icon(Icons.refresh),
+                                          onPressed: _getCurrentLocation,
+                                          color: AppTheme.primaryColor,
+                                          tooltip: 'Refresh Location',
+                                        ),
+                                    ],
+                                  ),
+                                  if (_locationError != null && _currentLocation == null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        'Tap refresh to get your location. This helps students find you.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 20),
                             
