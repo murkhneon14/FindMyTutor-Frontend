@@ -41,7 +41,7 @@ class _MainNavigationState extends State<MainNavigation> {
               color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: isDarkMode 
+                  color: isDarkMode
                       ? Colors.black.withOpacity(0.3)
                       : Colors.black.withOpacity(0.05),
                   blurRadius: 10,
@@ -51,7 +51,10 @@ class _MainNavigationState extends State<MainNavigation> {
             ),
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
@@ -94,7 +97,7 @@ class _MainNavigationState extends State<MainNavigation> {
     required bool isDarkMode,
   }) {
     final isActive = _currentIndex == index;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -115,9 +118,11 @@ class _MainNavigationState extends State<MainNavigation> {
           children: [
             Icon(
               isActive ? activeIcon : icon,
-              color: isActive 
-                  ? AppTheme.primaryColor 
-                  : isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+              color: isActive
+                  ? AppTheme.primaryColor
+                  : isDarkMode
+                  ? Colors.white70
+                  : AppTheme.textSecondary,
               size: 26,
             ),
             const SizedBox(height: 4),
@@ -126,9 +131,11 @@ class _MainNavigationState extends State<MainNavigation> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                color: isActive 
-                    ? AppTheme.primaryColor 
-                    : isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                color: isActive
+                    ? AppTheme.primaryColor
+                    : isDarkMode
+                    ? Colors.white70
+                    : AppTheme.textSecondary,
               ),
             ),
           ],

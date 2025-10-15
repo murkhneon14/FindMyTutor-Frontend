@@ -11,6 +11,3 @@ class ApiConfig {
   static String get teacherProfile => '$baseUrl/api/auth/teacher-profile';
   static String get me => '$baseUrl/api/auth/me';
 }
-
-
-

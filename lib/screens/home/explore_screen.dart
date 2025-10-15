@@ -29,7 +29,7 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   final List<Subject> _subjects = [
     Subject(
-      name: 'Math',
+      name: 'Mathematics',
       imageUrl:
           'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800',
       tutorCount: 245,
@@ -104,64 +104,118 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   Future<void> _searchNearbyTeachers() async {
     if (_currentLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enable location to search nearby teachers'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enable location to search nearby teachers'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       await _getCurrentLocation();
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isSearching = true);
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final token = prefs.getString('auth_token');
+      print('Auth Token: ${token != null ? 'Token exists' : 'No token found'}');
+
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please login to search for teachers'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final requestBody = {
+        'latitude': _currentLocation!.latitude,
+        'longitude': _currentLocation!.longitude,
+        'radius': _searchRadius,
+        if (_selectedSubject != null && _selectedSubject!.isNotEmpty)
+          'subject': _selectedSubject,
+        'page': 1,
+        'limit': 20,
+      };
+
+      print(
+        'Sending request to: ${ApiConfig.baseUrl}/api/auth/nearby-teachers',
+      );
+      print('Request body: $requestBody');
 
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/nearby-teachers'),
+        Uri.parse('${ApiConfig.baseUrl}/api/auth/nearby-teachers'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'latitude': _currentLocation!.latitude,
-          'longitude': _currentLocation!.longitude,
-          'radius': _searchRadius,
-          if (_selectedSubject != null) 'subject': _selectedSubject,
-          'page': 1,
-          'limit': 20,
-        }),
+        body: jsonEncode(requestBody),
       );
 
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final responseData = jsonDecode(response.body);
+        print('Parsed response data: $responseData');
+
+        final tutors = responseData['tutors'] ?? [];
+        print('Found ${tutors.length} teachers');
+
         setState(() {
-          _searchResults = data['tutors'] ?? [];
+          _searchResults = List<Map<String, dynamic>>.from(tutors);
         });
+
+        if (mounted) {
+          if (_searchResults.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No teachers found in your area'),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        }
       } else {
+        final errorMessage = response.body.isNotEmpty
+            ? jsonDecode(response.body)['message'] ?? 'Unknown error occurred'
+            : 'No response from server';
+
+        print('Error response: $errorMessage');
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to search: ${response.body}'),
+              content: Text('Error: $errorMessage'),
               backgroundColor: Colors.red,
             ),
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('Exception in _searchNearbyTeachers: $e');
+      print('Stack trace: $stackTrace');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('An error occurred: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } finally {
-      setState(() => _isSearching = false);
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
     }
   }
 
@@ -176,10 +230,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             Expanded(
               child: TabBarView(
                 controller: _tabController,
-                children: [
-                  _buildPopularTab(),
-                  _buildSearchTab(),
-                ],
+                children: [_buildPopularTab(), _buildSearchTab()],
               ),
             ),
           ],
@@ -203,19 +254,18 @@ class _ExploreScreenState extends State<ExploreScreen>
                   Text(
                     'Find Your',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w400,
-                          color: AppTheme.textSecondary,
-                        ),
+                      fontWeight: FontWeight.w400,
+                      color: AppTheme.textSecondary,
+                    ),
                   ),
                   ShaderMask(
                     shaderCallback: (bounds) =>
                         AppTheme.primaryGradient.createShader(bounds),
                     child: Text(
                       'Perfect Tutor',
-                      style:
-                          Theme.of(context).textTheme.displayMedium?.copyWith(
-                                color: Colors.white,
-                              ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.displayMedium?.copyWith(color: Colors.white),
                     ),
                   ),
                 ],
@@ -277,10 +327,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
         unselectedLabelColor: AppTheme.textSecondary,
-        labelStyle: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
+        labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         tabs: const [
           Tab(text: 'Popular'),
           Tab(text: 'Search'),
@@ -314,25 +361,31 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Widget _buildSearchTab() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         const SizedBox(height: 20),
-        
+
         // Location Status
         if (_currentLocation != null)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppTheme.successColor.withOpacity(0.1),
+              color: isDarkMode
+                  ? AppTheme.successColor.withOpacity(0.15)
+                  : AppTheme.successColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppTheme.successColor.withOpacity(0.3),
-              ),
+              border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.location_on, color: AppTheme.successColor, size: 20),
+                const Icon(
+                  Icons.location_on,
+                  color: AppTheme.successColor,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -348,14 +401,14 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ),
         const SizedBox(height: 16),
-        
+
         // Search Radius Slider
         Text(
           'Search Radius: ${_searchRadius.toStringAsFixed(1)} km',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         Slider(
@@ -365,6 +418,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           divisions: 49,
           label: '${_searchRadius.toStringAsFixed(1)} km',
           activeColor: AppTheme.primaryColor,
+          inactiveColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
           onChanged: (value) {
             setState(() {
               _searchRadius = value;
@@ -372,48 +426,66 @@ class _ExploreScreenState extends State<ExploreScreen>
           },
         ),
         const SizedBox(height: 16),
-        
+
         // Subject Filter
         Text(
           'Filter by Subject',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDarkMode ? Colors.grey[800] : Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.withOpacity(0.3)),
+            border: Border.all(
+              color: isDarkMode
+                  ? Colors.grey[700]!
+                  : Colors.grey.withOpacity(0.3),
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedSubject,
-              hint: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('All Subjects'),
+              dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: isDarkMode ? Colors.white70 : Colors.black87,
+              ),
+              hint: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'All Subjects',
+                  style: TextStyle(
+                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                  ),
+                ),
               ),
               isExpanded: true,
               items: [
-                const DropdownMenuItem(
+                DropdownMenuItem<String>(
                   value: null,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('All Subjects'),
+                  child: Text(
+                    'All Subjects',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white70 : Colors.black87,
+                    ),
                   ),
                 ),
-                ..._subjects.map((subject) {
-                  return DropdownMenuItem(
+                ..._subjects.map(
+                  (subject) => DropdownMenuItem<String>(
                     value: subject.name,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(subject.name),
+                    child: Text(
+                      subject.name,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                      ),
                     ),
-                  );
-                }).toList(),
+                  ),
+                ),
               ],
               onChanged: (value) {
                 setState(() {
@@ -423,80 +495,75 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        
+        const SizedBox(height: 24),
+
         // Search Button
         SizedBox(
           width: double.infinity,
-          height: 50,
           child: ElevatedButton(
             onPressed: _isSearching ? null : _searchNearbyTeachers,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
+              padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              elevation: 2,
+              backgroundColor: AppTheme.primaryColor,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppTheme.primaryColor.withOpacity(0.5),
             ),
             child: _isSearching
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
                       strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text(
-                        'Search Nearby Teachers',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                : const Text(
+                    'Search Teachers',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
           ),
         ),
-        const SizedBox(height: 30),
-        
+        const SizedBox(height: 20),
+
         // Search Results
-        if (_searchResults.isNotEmpty) ...[
-          Text(
-            'Found ${_searchResults.length} Teachers',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _searchResults.length,
-            itemBuilder: (context, index) {
-              final teacher = _searchResults[index];
-              return _buildTeacherCard(teacher);
-            },
-          ),
-        ] else if (_searchResults.isEmpty && !_isSearching) ...[
+        if (_searchResults.isNotEmpty)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_searchResults.length} Teachers Found',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ..._searchResults
+                  .map((teacher) => _buildTeacherCard(teacher))
+                  .toList(),
+            ],
+          )
+        else if (_isSearching)
+          const Center(child: CircularProgressIndicator())
+        else if (_searchController.text.isNotEmpty)
           Center(
             child: Column(
               children: [
                 Icon(
                   Icons.search_off,
                   size: 64,
-                  color: Colors.grey[400],
+                  color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No teachers found',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey[600],
+                    color: isDarkMode ? Colors.white70 : Colors.grey[600],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -504,30 +571,30 @@ class _ExploreScreenState extends State<ExploreScreen>
                   'Try adjusting your search radius or filters',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[500],
+                    color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
                   ),
                 ),
               ],
             ),
           ),
-        ],
       ],
     );
   }
 
-  Widget _buildTeacherCard(dynamic teacher) {
-    final user = teacher['userId'];
-    final name = user?['name'] ?? 'Unknown';
-    final email = user?['email'] ?? '';
+  Widget _buildTeacherCard(Map<String, dynamic> teacher) {
+    final user = teacher['userId'] ?? {};
+    final name = user['name']?.toString() ?? 'Unknown';
+    final email = user['email']?.toString() ?? '';
     final subjects = (teacher['subjects'] as List?)?.join(', ') ?? 'N/A';
-    final experience = teacher['experience'] ?? 'N/A';
-    final fees = teacher['fees'] ?? 0;
-    final qualifications = teacher['qualifications'] ?? 'N/A';
+    final experience = teacher['experience']?.toString() ?? 'N/A';
+    final fees = teacher['fees']?.toDouble() ?? 0.0;
+    final qualifications = teacher['qualifications']?.toString() ?? 'N/A';
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDarkMode ? Colors.grey[800] : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -548,7 +615,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                   radius: 30,
                   backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
                   child: Text(
-                    name[0].toUpperCase(),
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -563,10 +630,12 @@ class _ExploreScreenState extends State<ExploreScreen>
                     children: [
                       Text(
                         name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.textPrimary,
+                          color: isDarkMode
+                              ? Colors.white
+                              : AppTheme.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -574,20 +643,25 @@ class _ExploreScreenState extends State<ExploreScreen>
                         subjects,
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey[600],
+                          color: isDarkMode
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
                         ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     gradient: AppTheme.primaryGradient,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '₹$fees/hr',
+                    '₹${fees.toStringAsFixed(0)}/hr',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -600,14 +674,18 @@ class _ExploreScreenState extends State<ExploreScreen>
             const SizedBox(height: 16),
             Row(
               children: [
-                Icon(Icons.school, size: 16, color: Colors.grey[600]),
+                Icon(
+                  Icons.school,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     qualifications,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.grey[700],
+                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                     ),
                   ),
                 ),
@@ -616,13 +694,17 @@ class _ExploreScreenState extends State<ExploreScreen>
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.work, size: 16, color: Colors.grey[600]),
+                Icon(
+                  Icons.work,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
                 const SizedBox(width: 8),
                 Text(
                   '$experience years experience',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.grey[700],
+                    color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                   ),
                 ),
               ],
