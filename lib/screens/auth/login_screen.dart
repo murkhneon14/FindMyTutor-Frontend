@@ -56,9 +56,26 @@ class _LoginScreenState extends State<LoginScreen> {
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           final token = data['token'] as String?;
+          final user = data['user'] as Map<String, dynamic>?;
+          
           if (token != null && token.isNotEmpty) {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('auth_token', token);
+            
+            // Save user information
+            if (user != null) {
+              final userId = user['_id']?.toString() ?? user['id']?.toString();
+              final userName = user['name']?.toString();
+              final userEmail = user['email']?.toString();
+              final userRole = user['role']?.toString();
+              
+              if (userId != null) await prefs.setString('user_id', userId);
+              if (userName != null) await prefs.setString('user_name', userName);
+              if (userEmail != null) await prefs.setString('user_email', userEmail);
+              if (userRole != null) await prefs.setString('user_role', userRole);
+              
+              debugPrint('Saved user data: ID=$userId, Name=$userName, Email=$userEmail, Role=$userRole');
+            }
           }
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

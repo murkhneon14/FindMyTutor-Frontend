@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:overlay_support/overlay_support.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'config/theme.dart' show ThemeNotifier, AppTheme;
 
@@ -32,13 +33,15 @@ class FindMyTutorApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ThemeNotifier>(
       builder: (context, themeNotifier, child) {
-        return MaterialApp(
-          title: 'FindMyTutor',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          home: const OnboardingScreen(),
+        return OverlaySupport.global(
+          child: MaterialApp(
+            title: 'FindMyTutor',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            home: const OnboardingScreen(),
+          ),
         );
       },
     );

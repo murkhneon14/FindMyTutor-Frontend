@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3000',
+    defaultValue: 'https://findmy-tutor-backend.onrender.com',
   );
 
   // Auth endpoints
@@ -16,11 +16,12 @@ class ApiConfig {
   static String get chatBase => '$baseUrl/api/chat';
   static String get chatCreate => '$baseUrl/api/chat/create';
   static String chatUser(String userId) => '$baseUrl/api/chat/user/$userId';
-  static String chatMessages(String chatId) => '$baseUrl/api/chat/$chatId/messages';
+  static String chatMessages(String chatId) =>
+      '$baseUrl/api/chat/$chatId/messages';
   static String get chatSendMessage => '$baseUrl/api/chat/message';
   static String get chatMarkAsRead => '$baseUrl/api/chat/read';
   static String chatDelete(String chatId) => '$baseUrl/api/chat/$chatId';
-  
+
   // Socket.IO endpoint
   static String get socketUrl => baseUrl;
 }

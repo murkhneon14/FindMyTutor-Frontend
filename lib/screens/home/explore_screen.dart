@@ -8,6 +8,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/api.dart';
+import '../../services/chat_service.dart';
+import '../../models/chat_room.dart';
+import '../chat_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -20,12 +23,15 @@ class _ExploreScreenState extends State<ExploreScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  final ChatService _chatService = ChatService();
   Position? _currentLocation;
   bool _isLoadingLocation = false;
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
   String? _selectedSubject;
   double _searchRadius = 5.0; // km
+  String? _currentUserId;
+  String? _currentUserName;
 
   final List<Subject> _subjects = [
     Subject(
@@ -77,6 +83,54 @@ class _ExploreScreenState extends State<ExploreScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _getCurrentLocation();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? userId = prefs.getString('user_id');
+    String? userName = prefs.getString('user_name');
+    
+    // If user data is not in SharedPreferences, try to fetch it from the API
+    if (userId == null || userName == null) {
+      final token = prefs.getString('auth_token');
+      if (token != null) {
+        try {
+          final response = await http.get(
+            Uri.parse('${ApiConfig.baseUrl}/api/auth/me'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          );
+          
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final user = data['user'] ?? data;
+            
+            userId = user['_id']?.toString() ?? user['id']?.toString();
+            userName = user['name']?.toString();
+            final userEmail = user['email']?.toString();
+            final userRole = user['role']?.toString();
+            
+            // Save to SharedPreferences for future use
+            if (userId != null) await prefs.setString('user_id', userId);
+            if (userName != null) await prefs.setString('user_name', userName);
+            if (userEmail != null) await prefs.setString('user_email', userEmail);
+            if (userRole != null) await prefs.setString('user_role', userRole);
+            
+            print('Fetched and saved user data: ID=$userId, Name=$userName');
+          }
+        } catch (e) {
+          print('Error fetching user data: $e');
+        }
+      }
+    }
+    
+    setState(() {
+      _currentUserId = userId;
+      _currentUserName = userName;
+    });
   }
 
   @override
@@ -581,6 +635,96 @@ class _ExploreScreenState extends State<ExploreScreen>
     );
   }
 
+  Future<void> _handleMessageTeacher(Map<String, dynamic> teacher) async {
+    if (_currentUserId == null || _currentUserName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to message teachers'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final user = teacher['userId'] ?? {};
+    final teacherId = user['_id']?.toString();
+    final teacherName = user['name']?.toString() ?? 'Teacher';
+    final teacherEmail = user['email']?.toString() ?? '';
+
+    if (teacherId == null || teacherId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to message this teacher'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Get or create chat
+      final chatRoom = await _chatService.getOrCreateChat(
+        _currentUserId!,
+        teacherId,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (chatRoom != null) {
+        // Navigate to chat screen
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                chatId: chatRoom.id,
+                currentUserId: _currentUserId!,
+                currentUserName: _currentUserName!,
+                otherUser: ChatUser(
+                  id: teacherId,
+                  name: teacherName,
+                  email: teacherEmail,
+                  role: 'teacher',
+                ),
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create chat. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildTeacherCard(Map<String, dynamic> teacher) {
     final user = teacher['userId'] ?? {};
     final name = user['name']?.toString() ?? 'Unknown';
@@ -712,18 +856,17 @@ class _ExploreScreenState extends State<ExploreScreen>
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // TODO: Navigate to teacher profile or contact
-                },
+              child: ElevatedButton.icon(
+                onPressed: () => _handleMessageTeacher(teacher),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'View Profile',
+                icon: const Icon(Icons.message, color: Colors.white, size: 18),
+                label: const Text(
+                  'Message',
                   style: TextStyle(color: Colors.white),
                 ),
               ),

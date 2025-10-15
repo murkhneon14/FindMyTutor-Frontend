@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
+import '../../services/global_notification_manager.dart';
 import 'explore_screen.dart';
 import 'messages_screen.dart';
 import 'account_screen.dart';
@@ -16,11 +17,16 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 1; // Start with Explore tab
+  final GlobalNotificationManager _notificationManager = GlobalNotificationManager();
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, 2);
+    // Initialize global notification manager after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _notificationManager.initialize(context);
+    });
   }
 
   final List<Widget> _screens = [

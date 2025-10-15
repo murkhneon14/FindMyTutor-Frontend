@@ -6,7 +6,8 @@ import '../models/chat_room.dart';
 import '../models/chat_message.dart';
 import '../services/chat_service.dart';
 import '../services/socket_service.dart';
-import 'dart:async';
+import '../services/global_notification_manager.dart';
+import '../config/api.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -29,16 +30,18 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final SocketService _socketService = SocketService();
+  final GlobalNotificationManager _notificationManager = GlobalNotificationManager();
   final List<types.Message> _messages = [];
   late types.User _currentUser;
   late types.User _otherUser;
   bool _isLoading = true;
-  Timer? _typingTimer;
   bool _isOtherUserTyping = false;
 
   @override
   void initState() {
     super.initState();
+    // Tell notification manager we're in this chat
+    _notificationManager.setCurrentChatId(widget.chatId);
     _initializeChat();
   }
 
@@ -54,14 +57,37 @@ class _ChatScreenState extends State<ChatScreen> {
       firstName: widget.otherUser.name,
     );
 
-    // Join chat room
-    _socketService.joinChat(widget.chatId);
+    // Connect to socket if not already connected
+    if (!_socketService.isConnected) {
+      print('Connecting to socket: ${ApiConfig.socketUrl}');
+      _socketService.connect(ApiConfig.socketUrl, widget.currentUserId);
+      
+      // Wait a bit for connection to establish, then join chat
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_socketService.isConnected) {
+          _socketService.joinChat(widget.chatId);
+          print('Joined chat: ${widget.chatId}');
+        } else {
+          print('Socket not connected yet, retrying...');
+          Future.delayed(const Duration(seconds: 1), () {
+            _socketService.joinChat(widget.chatId);
+          });
+        }
+      });
+    } else {
+      // Already connected, join immediately
+      _socketService.joinChat(widget.chatId);
+      print('Joined chat: ${widget.chatId}');
+    }
 
     // Listen to new messages
     _socketService.messageStream.listen((data) {
       if (data['chatId'] == widget.chatId) {
         final message = ChatMessage.fromJson(data['message']);
-        _addMessage(message);
+        // Only add messages from other users (not your own sent messages)
+        if (message.senderId != widget.currentUserId) {
+          _addMessage(message);
+        }
       }
     });
 
@@ -125,7 +151,7 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _handleSendPressed(types.PartialText message) {
+  void _handleSendPressed(types.PartialText message) async {
     final textMessage = types.TextMessage(
       author: _currentUser,
       createdAt: DateTime.now().millisecondsSinceEpoch,
@@ -138,20 +164,91 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.insert(0, textMessage);
     });
 
-    // Send via socket
-    _socketService.sendMessage({
-      'chatId': widget.chatId,
-      'senderId': widget.currentUserId,
-      'text': message.text,
-      'type': 'text',
-    });
-
-    // Stop typing indicator
-    _socketService.sendTypingIndicator(
-      widget.chatId,
-      widget.currentUserId,
-      false,
-    );
+    // Try to send via socket first
+    if (_socketService.isConnected) {
+      print('Sending message via socket...');
+      _socketService.sendMessage({
+        'chatId': widget.chatId,
+        'senderId': widget.currentUserId,
+        'text': message.text,
+        'type': 'text',
+      });
+      
+      // Update status to sent after a short delay (socket doesn't return confirmation immediately)
+      Future.delayed(const Duration(milliseconds: 500), () {
+        final index = _messages.indexWhere((m) => m.id == textMessage.id);
+        if (index != -1 && mounted) {
+          final updatedMessage = textMessage.copyWith(
+            status: types.Status.sent,
+          );
+          setState(() {
+            _messages[index] = updatedMessage;
+          });
+        }
+      });
+    } else {
+      // Fallback to HTTP if socket is not connected
+      print('Socket not connected, sending via HTTP...');
+      try {
+        final sentMessage = await _chatService.sendMessage(
+          chatId: widget.chatId,
+          senderId: widget.currentUserId,
+          text: message.text,
+        );
+        
+        if (sentMessage != null) {
+          // Remove the temporary message and add the real one from server
+          final index = _messages.indexWhere((m) => m.id == textMessage.id);
+          if (index != -1) {
+            final realMessage = _convertToFlutterChatMessage(sentMessage);
+            setState(() {
+              _messages[index] = realMessage;
+            });
+          }
+          print('Message sent successfully via HTTP');
+        } else {
+          // Failed to send - update status to error
+          print('Failed to send message via HTTP');
+          final index = _messages.indexWhere((m) => m.id == textMessage.id);
+          if (index != -1 && mounted) {
+            final errorMessage = textMessage.copyWith(
+              status: types.Status.error,
+            );
+            setState(() {
+              _messages[index] = errorMessage;
+            });
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to send message. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        print('Error sending message: $e');
+        // Update status to error
+        final index = _messages.indexWhere((m) => m.id == textMessage.id);
+        if (index != -1 && mounted) {
+          final errorMessage = textMessage.copyWith(
+            status: types.Status.error,
+          );
+          setState(() {
+            _messages[index] = errorMessage;
+          });
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _handlePreviewDataFetched(
@@ -165,26 +262,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _messages[index] = updatedMessage;
-    });
-  }
-
-  void _handleTyping() {
-    _socketService.sendTypingIndicator(
-      widget.chatId,
-      widget.currentUserId,
-      true,
-    );
-
-    // Cancel previous timer
-    _typingTimer?.cancel();
-
-    // Set new timer to stop typing indicator after 2 seconds
-    _typingTimer = Timer(const Duration(seconds: 2), () {
-      _socketService.sendTypingIndicator(
-        widget.chatId,
-        widget.currentUserId,
-        false,
-      );
     });
   }
 
@@ -240,11 +317,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   fontWeight: FontWeight.w400,
                 ),
               ),
-              onTextChanged: (text) {
-                if (text.isNotEmpty) {
-                  _handleTyping();
-                }
-              },
               emptyState: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -279,7 +351,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    _typingTimer?.cancel();
+    // Tell notification manager we left this chat
+    _notificationManager.setCurrentChatId(null);
     _socketService.leaveChat(widget.chatId);
     super.dispose();
   }
