@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:overlay_support/overlay_support.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'config/theme.dart' show ThemeNotifier, AppTheme;
+import 'services/fcm_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +20,15 @@ void main() async {
   // Load theme preference before running the app
   final prefs = await SharedPreferences.getInstance();
   final isDarkMode = prefs.getBool('isDarkMode') ?? false;
+  
+  // Initialize Firebase
+  await Firebase.initializeApp();
+  
+  // Set up background message handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  
+  // Initialize FCM service
+  await FCMService().initialize();
   
   runApp(
     ChangeNotifierProvider(

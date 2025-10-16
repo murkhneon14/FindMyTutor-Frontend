@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/fcm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/api.dart';
 import '../home/main_navigation.dart';
@@ -75,6 +76,11 @@ class _LoginScreenState extends State<LoginScreen> {
               if (userRole != null) await prefs.setString('user_role', userRole);
               
               debugPrint('Saved user data: ID=$userId, Name=$userName, Email=$userEmail, Role=$userRole');
+              
+              // Send FCM token to backend
+              if (userId != null) {
+                await FCMService().sendTokenToServer(userId);
+              }
             }
           }
           ScaffoldMessenger.of(context).showSnackBar(
