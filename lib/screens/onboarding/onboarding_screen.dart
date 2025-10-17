@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/theme.dart';
 import '../home/main_navigation.dart';
 import 'widgets/onboarding_page.dart';
@@ -48,10 +49,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     });
   }
 
-  void _skipToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const MainNavigation()),
-    );
+  Future<void> _markOnboardingComplete() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasCompletedOnboarding', true);
+  }
+
+  Future<void> _skipToHome() async {
+    await _markOnboardingComplete();
+    if (mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const MainNavigation()),
+      );
+    }
   }
 
   void _nextPage() {

@@ -8,6 +8,9 @@ import '../../config/api.dart';
 import '../auth/auth_choice_screen.dart';
 import 'main_navigation.dart';
 import 'profile_details_screen.dart';
+import 'faq_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'terms_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -274,33 +277,43 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             ),
             const SizedBox(height: 30),
-            // Profile Completion Status
-            _buildProfileCompletionCard(),
+            // Premium Promotional Card
+            _buildPremiumPromotionalCard(),
+            const SizedBox(height: 16),
+            // Advertisement Banner
+            _buildAdvertisementBanner(),
             const SizedBox(height: 20),
             // Menu Items
             _buildMenuItem(
-              Icons.person_outline,
-              'Personal Information',
-              'Update your personal details',
-              () {},
+              Icons.workspace_premium,
+              'Premium',
+              'Upgrade to unlock premium features',
+              () => _showPremiumDialog(context),
+              isPremium: true,
             ),
             _buildMenuItem(
-              Icons.school_outlined,
-              'Education',
-              'Add or update your education',
-              () {},
+              Icons.help_outline,
+              'FAQ',
+              'Frequently asked questions',
+              () => _navigateToFAQ(context),
             ),
             _buildMenuItem(
-              Icons.work_outline,
-              'Experience',
-              'Add your work experience',
-              () {},
+              Icons.privacy_tip_outlined,
+              'Privacy Policy',
+              'Read our privacy policy',
+              () => _navigateToPrivacyPolicy(context),
             ),
             _buildMenuItem(
-              Icons.lock_outline,
-              'Change Password',
-              'Update your password',
-              () {},
+              Icons.description_outlined,
+              'Terms & Conditions',
+              'Read our terms and conditions',
+              () => _navigateToTerms(context),
+            ),
+            _buildMenuItem(
+              Icons.info_outline,
+              'About Us',
+              'Learn more about FindMyTutor',
+              () => _showAboutDialog(context),
             ),
             // Dark Mode Toggle
             Container(
@@ -409,114 +422,318 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  Widget _buildProfileCompletionCard() {
-    return Consumer<ThemeNotifier>(
-      builder: (context, themeNotifier, _) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: themeNotifier.isDarkMode
-                ? const Color(0xFF1E1E1E)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: themeNotifier.isDarkMode
-                    ? Colors.black.withOpacity(0.3)
-                    : const Color.fromARGB(185, 152, 220, 16).withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
+  Widget _buildPremiumPromotionalCard() {
+    return InkWell(
+      onTap: () => _showPremiumDialog(context),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF6B46C1), // Purple
+              Color(0xFF9333EA), // Violet
+              Color(0xFFEC4899), // Pink
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_outlined,
-                      color: AppTheme.primaryColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Profile Completion',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: themeNotifier.isDarkMode
-                          ? Colors.white
-                          : Colors.black,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '75%',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ],
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF9333EA).withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+      child: Stack(
+        children: [
+          // Decorative circles
+          Positioned(
+            top: -20,
+            right: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
               ),
-              const SizedBox(height: 16),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: 0.75,
-                  backgroundColor: themeNotifier.isDarkMode
-                      ? Colors.grey[800]
-                      : Colors.grey[200],
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    AppTheme.primaryColor,
-                  ),
-                  minHeight: 8,
+            ),
+          ),
+          Positioned(
+            bottom: -30,
+            left: -30,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.1),
+              ),
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.workspace_premium,
+                            color: Colors.amber[300],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          const Text(
+                            'PREMIUM',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Complete your profile to get better tutor matches',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: themeNotifier.isDarkMode
-                      ? Colors.grey[400]
-                      : AppTheme.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    // Navigate to complete profile
-                  },
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(50, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                const SizedBox(height: 16),
+                const Text(
+                  'Unlock Premium\nFeatures Today! 🚀',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
                   ),
-                  child: Text(
-                    'Complete Now',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontWeight: FontWeight.w600,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Get unlimited access to all tutors, priority support, and exclusive features',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              '₹499/month',
+                              style: TextStyle(
+                                color: Color(0xFF9333EA),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF9333EA),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  Widget _buildAdvertisementBanner() {
+    return InkWell(
+      onTap: () {
+        // You can add email launch functionality here
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contact us at support@findmytutor.com'),
+            backgroundColor: Color(0xFF2563EB),
+            duration: Duration(seconds: 3),
           ),
         );
       },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0EA5E9), // Sky blue
+              Color(0xFF2563EB), // Blue
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2563EB).withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+      child: Stack(
+        children: [
+          // Decorative pattern
+          Positioned(
+            right: -10,
+            top: -10,
+            child: Icon(
+              Icons.school_rounded,
+              size: 80,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          Positioned(
+            left: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.campaign_rounded,
+              size: 100,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          // Content
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        '📢 ADVERTISE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Promote Your Coaching\nor School Here!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Reach thousands of students looking for quality education',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.email_outlined,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'support@findmytutor.com',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.95),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
     );
   }
 
@@ -524,28 +741,217 @@ class _AccountScreenState extends State<AccountScreen> {
     IconData icon,
     String title,
     String subtitle,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppTheme.primaryColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
+    VoidCallback onTap, {
+    bool isPremium = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        gradient: isPremium ? AppTheme.primaryGradient : null,
+        color: isPremium ? null : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: isPremium
+                ? AppTheme.primaryColor.withOpacity(0.3)
+                : Colors.black.withOpacity(0.05),
+            blurRadius: isPremium ? 12 : 10,
+            offset: Offset(0, isPremium ? 6 : 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isPremium
+                ? Colors.white.withOpacity(0.2)
+                : AppTheme.primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: isPremium ? Colors.white : AppTheme.primaryColor,
+          ),
         ),
-        child: Icon(icon, color: AppTheme.primaryColor),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isPremium ? Colors.white : null,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 14,
+            color: isPremium ? Colors.white70 : AppTheme.textSecondary,
+          ),
+        ),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: isPremium ? Colors.white : null,
+        ),
+        onTap: onTap,
       ),
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+    );
+  }
+
+  void _showPremiumDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.workspace_premium, color: AppTheme.primaryColor),
+            const SizedBox(width: 8),
+            const Text('Go Premium'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Unlock premium features:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            _buildPremiumFeature('✨ Unlimited tutor searches'),
+            _buildPremiumFeature('💬 Priority chat support'),
+            _buildPremiumFeature('📊 Advanced analytics'),
+            _buildPremiumFeature('🎯 Featured profile listing'),
+            _buildPremiumFeature('🔔 Instant notifications'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Premium Plan',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    '₹499/month',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Premium feature coming soon!'),
+                  backgroundColor: AppTheme.primaryColor,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Upgrade Now'),
+          ),
+        ],
       ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+    );
+  }
+
+  Widget _buildPremiumFeature(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Text(text, style: const TextStyle(fontSize: 15)),
+    );
+  }
+
+  void _navigateToFAQ(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FAQScreen()),
+    );
+  }
+
+  void _navigateToPrivacyPolicy(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+    );
+  }
+
+  void _navigateToTerms(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const TermsScreen()),
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(Icons.school_rounded, color: AppTheme.primaryColor, size: 32),
+            const SizedBox(width: 8),
+            const Text('About FindMyTutor'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'FindMyTutor connects students with qualified teachers for personalized, face-to-face tutoring.',
+              style: TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Version: 1.0.0',
+              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '© 2025 FindMyTutor. All rights reserved.',
+              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
     );
   }
 }

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'screens/onboarding/onboarding_screen.dart';
+import 'screens/splash_screen.dart';
 import 'config/theme.dart' show ThemeNotifier, AppTheme;
 import 'services/fcm_service.dart';
 
@@ -52,7 +51,7 @@ class FindMyTutorApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeNotifier.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            home: const OnboardingScreen(),
+            home: const SplashScreen(),
           ),
         );
       },
