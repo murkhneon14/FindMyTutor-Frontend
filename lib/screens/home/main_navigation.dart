@@ -15,18 +15,27 @@ class MainNavigation extends StatefulWidget {
   State<MainNavigation> createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
-  int _currentIndex = 1; // Start with Explore tab
+class _MainNavigationState extends State<MainNavigation>
+    with SingleTickerProviderStateMixin {
+  late int _currentIndex;
   final GlobalNotificationManager _notificationManager = GlobalNotificationManager();
+  late PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, 2);
+    _pageController = PageController(initialPage: _currentIndex);
     // Initialize global notification manager after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _notificationManager.initialize(context);
     });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   final List<Widget> _screens = [
@@ -38,7 +47,16 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        physics: const BouncingScrollPhysics(),
+        children: _screens,
+      ),
       bottomNavigationBar: Consumer<ThemeNotifier>(
         builder: (context, themeNotifier, _) {
           final isDarkMode = themeNotifier.isDarkMode;
@@ -106,9 +124,11 @@ class _MainNavigationState extends State<MainNavigation> {
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
+        _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOutCubic,
+        );
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -122,14 +142,19 @@ class _MainNavigationState extends State<MainNavigation> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              color: isActive
-                  ? AppTheme.primaryColor
-                  : isDarkMode
-                  ? Colors.white70
-                  : AppTheme.textSecondary,
-              size: 26,
+            AnimatedScale(
+              scale: isActive ? 1.1 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              child: Icon(
+                isActive ? activeIcon : icon,
+                color: isActive
+                    ? AppTheme.primaryColor
+                    : isDarkMode
+                    ? Colors.white70
+                    : AppTheme.textSecondary,
+                size: 26,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
