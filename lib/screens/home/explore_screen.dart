@@ -661,6 +661,17 @@ class _ExploreScreenState extends State<ExploreScreen>
       return;
     }
 
+    // Don't allow messaging yourself
+    if (teacherId == _currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot message yourself'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     // Show loading indicator
     showDialog(
       context: context,
@@ -704,8 +715,9 @@ class _ExploreScreenState extends State<ExploreScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to create chat. Please try again.'),
+              content: Text('Unable to start chat. Please try logging out and logging in again.'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
             ),
           );
         }

@@ -9,6 +9,7 @@ class ChatService {
   // Get or create a chat between two users
   Future<ChatRoom?> getOrCreateChat(String userId, String otherUserId) async {
     try {
+      print('Creating chat: userId=$userId, otherUserId=$otherUserId');
       final response = await http.post(
         Uri.parse(ApiConfig.chatCreate),
         headers: {'Content-Type': 'application/json'},
@@ -18,11 +19,16 @@ class ChatService {
         }),
       );
 
-      if (response.statusCode == 200) {
+      print('Chat creation response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         return ChatRoom.fromJson(data['chat']);
       } else {
-        print('Error creating chat: ${response.body}');
+        print('❌ Error creating chat: ${response.body}');
+        print('❌ Your user ID: $userId');
+        print('❌ Other user ID: $otherUserId');
+        print('⚠️ One of these users does not exist in the backend database');
         return null;
       }
     } catch (e) {

@@ -47,9 +47,32 @@ class ChatRoom {
   factory ChatRoom.fromJson(Map<String, dynamic> json) {
     List<ChatUser> participantsList = [];
     if (json['participants'] != null) {
-      participantsList = (json['participants'] as List)
-          .map((p) => ChatUser.fromJson(p))
-          .toList();
+      final participants = json['participants'] as List;
+      
+      // Handle both string IDs and full user objects
+      participantsList = participants.map((p) {
+        if (p is String) {
+          // If participant is just an ID string, create a minimal ChatUser
+          final names = json['participantNames'] as List?;
+          final index = participants.indexOf(p);
+          final name = (names != null && index < names.length) 
+              ? names[index].toString() 
+              : 'User';
+          
+          return ChatUser(
+            id: p,
+            name: name,
+            email: '',
+            role: '',
+          );
+        } else if (p is Map<String, dynamic>) {
+          // If participant is a full user object
+          return ChatUser.fromJson(p);
+        } else {
+          // Fallback
+          return ChatUser(id: '', name: 'Unknown', email: '', role: '');
+        }
+      }).toList();
     }
 
     List<ChatMessage> messagesList = [];

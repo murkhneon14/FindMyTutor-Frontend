@@ -44,6 +44,7 @@ class _AccountScreenState extends State<AccountScreen> {
       _loading = true;
     });
     try {
+      print('🔍 Fetching user profile from: ${ApiConfig.me}');
       final response = await http.get(
         Uri.parse(ApiConfig.me),
         headers: {
@@ -51,18 +52,24 @@ class _AccountScreenState extends State<AccountScreen> {
           'Authorization': 'Bearer $token',
         },
       );
+      print('👤 Profile response: ${response.statusCode} - ${response.body}');
+      
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final user = data['user'] as Map<String, dynamic>?;
+        print('✅ User profile loaded: ${user?['_id']} - ${user?['name']} (${user?['email']})');
         setState(() {
-          _user = data['user'] as Map<String, dynamic>?;
+          _user = user;
         });
       } else {
+        print('❌ Failed to fetch profile: ${response.statusCode}');
         // If token invalid, treat as logged out
         setState(() {
           _isLoggedIn = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      print('❌ Error fetching profile: $e');
       // network error - keep prior state
     } finally {
       if (mounted) {
