@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/theme.dart';
 import '../../models/subject.dart';
-import 'widgets/subject_card.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../services/location_service.dart';
 import 'package:http/http.dart' as http;
@@ -361,19 +360,30 @@ class _ExploreScreenState extends State<ExploreScreen>
   Widget _buildTabBar() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF0),
-        borderRadius: BorderRadius.circular(8),
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey[850]
+            : Colors.grey[100],
+        borderRadius: BorderRadius.circular(25),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TabBar(
         controller: _tabController,
+        dividerColor: Colors.transparent,
         indicator: BoxDecoration(
           gradient: AppTheme.primaryGradient,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.primaryColor.withOpacity(0.3),
-              blurRadius: 8,
+              color: AppTheme.primaryColor.withOpacity(0.4),
+              blurRadius: 12,
               offset: const Offset(0, 4),
             ),
           ],
@@ -381,10 +391,38 @@ class _ExploreScreenState extends State<ExploreScreen>
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.white,
         unselectedLabelColor: AppTheme.textSecondary,
-        labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
         tabs: const [
-          Tab(text: 'Popular'),
-          Tab(text: 'Search'),
+          Tab(
+            height: 48,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.star_rounded, size: 20),
+                SizedBox(width: 8),
+                Text('Popular'),
+              ],
+            ),
+          ),
+          Tab(
+            height: 48,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.search_rounded, size: 20),
+                SizedBox(width: 8),
+                Text('Search'),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -394,7 +432,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -406,7 +444,10 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
           itemCount: _subjects.length,
           itemBuilder: (context, index) {
-            return SubjectCard(subject: _subjects[index]);
+            return _AnimatedSubjectCard(
+              subject: _subjects[index],
+              index: index,
+            );
           },
         ),
         const SizedBox(height: 20),
@@ -887,5 +928,225 @@ class _ExploreScreenState extends State<ExploreScreen>
         ),
       ),
     );
+  }
+}
+
+// Animated 3D Subject Card Widget
+class _AnimatedSubjectCard extends StatefulWidget {
+  final Subject subject;
+  final int index;
+
+  const _AnimatedSubjectCard({
+    required this.subject,
+    required this.index,
+  });
+
+  @override
+  State<_AnimatedSubjectCard> createState() => _AnimatedSubjectCardState();
+}
+
+class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _slideAnimation;
+  bool _isHovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: Duration(milliseconds: 600 + (widget.index * 100)),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.elasticOut,
+      ),
+    );
+
+    _slideAnimation = Tween<double>(begin: 50.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    // Start animation
+    Future.delayed(Duration(milliseconds: widget.index * 100), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _slideAnimation.value),
+          child: Transform.scale(
+            scale: _scaleAnimation.value,
+            child: MouseRegion(
+              onEnter: (_) => setState(() => _isHovered = true),
+              onExit: (_) => setState(() => _isHovered = false),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001)
+                  ..rotateX(_isHovered ? -0.05 : 0.0)
+                  ..rotateY(_isHovered ? 0.05 : 0.0),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  transform: Matrix4.translationValues(
+                    0,
+                    _isHovered ? -8 : 0,
+                    0,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.subject.color.withOpacity(_isHovered ? 0.4 : 0.2),
+                        blurRadius: _isHovered ? 20 : 12,
+                        offset: Offset(0, _isHovered ? 12 : 6),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            widget.subject.color,
+                            widget.subject.color.withOpacity(0.8),
+                          ],
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          // Background pattern
+                          Positioned(
+                            right: -20,
+                            top: -20,
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            left: -30,
+                            bottom: -30,
+                            child: Container(
+                              width: 120,
+                              height: 120,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.1),
+                              ),
+                            ),
+                          ),
+                          // Content
+                          Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(
+                                        _getSubjectIcon(widget.subject.name),
+                                        color: Colors.white,
+                                        size: 32,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      widget.subject.name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.person_outline,
+                                      color: Colors.white70,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${widget.subject.tutorCount} tutors',
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  IconData _getSubjectIcon(String subjectName) {
+    switch (subjectName.toLowerCase()) {
+      case 'mathematics':
+        return Icons.calculate_rounded;
+      case 'history':
+        return Icons.history_edu_rounded;
+      case 'science':
+        return Icons.science_rounded;
+      case 'english':
+        return Icons.menu_book_rounded;
+      case 'physics':
+        return Icons.bolt_rounded;
+      case 'chemistry':
+        return Icons.biotech_rounded;
+      default:
+        return Icons.school_rounded;
+    }
   }
 }
