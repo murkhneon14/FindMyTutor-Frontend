@@ -21,6 +21,7 @@ class ExploreScreen extends StatefulWidget {
 class _ExploreScreenState extends State<ExploreScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late PageController _bannerController;
   final TextEditingController _searchController = TextEditingController();
   final ChatService _chatService = ChatService();
   Position? _currentLocation;
@@ -31,6 +32,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
+  int _currentBannerPage = 0;
 
   final List<Subject> _subjects = [
     Subject(
@@ -81,15 +83,32 @@ class _ExploreScreenState extends State<ExploreScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _bannerController = PageController(viewportFraction: 0.9);
     _getCurrentLocation();
     _loadCurrentUser();
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _bannerController.hasClients) {
+        final nextPage = (_currentBannerPage + 1) % 3;
+        _bannerController.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+        _currentBannerPage = nextPage;
+        _startAutoScroll();
+      }
+    });
   }
 
   Future<void> _loadCurrentUser() async {
     final prefs = await SharedPreferences.getInstance();
     String? userId = prefs.getString('user_id');
     String? userName = prefs.getString('user_name');
-    
+
     // If user data is not in SharedPreferences, try to fetch it from the API
     if (userId == null || userName == null) {
       final token = prefs.getString('auth_token');
@@ -102,22 +121,23 @@ class _ExploreScreenState extends State<ExploreScreen>
               'Authorization': 'Bearer $token',
             },
           );
-          
+
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
             final user = data['user'] ?? data;
-            
+
             userId = user['_id']?.toString() ?? user['id']?.toString();
             userName = user['name']?.toString();
             final userEmail = user['email']?.toString();
             final userRole = user['role']?.toString();
-            
+
             // Save to SharedPreferences for future use
             if (userId != null) await prefs.setString('user_id', userId);
             if (userName != null) await prefs.setString('user_name', userName);
-            if (userEmail != null) await prefs.setString('user_email', userEmail);
+            if (userEmail != null)
+              await prefs.setString('user_email', userEmail);
             if (userRole != null) await prefs.setString('user_role', userRole);
-            
+
             print('Fetched and saved user data: ID=$userId, Name=$userName');
           }
         } catch (e) {
@@ -125,7 +145,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         }
       }
     }
-    
+
     setState(() {
       _currentUserId = userId;
       _currentUserName = userName;
@@ -135,6 +155,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _bannerController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -279,6 +300,8 @@ class _ExploreScreenState extends State<ExploreScreen>
         child: Column(
           children: [
             _buildHeader(),
+            _buildPromoBanner(),
+            const SizedBox(height: 16),
             _buildTabBar(),
             Expanded(
               child: TabBarView(
@@ -305,7 +328,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Find Your',
+                    'Find My',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w400,
                       color: AppTheme.textSecondary,
@@ -315,7 +338,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     shaderCallback: (bounds) =>
                         AppTheme.primaryGradient.createShader(bounds),
                     child: Text(
-                      'Perfect Tutor',
+                      ' Tutor',
                       style: Theme.of(
                         context,
                       ).textTheme.displayMedium?.copyWith(color: Colors.white),
@@ -353,6 +376,136 @@ class _ExploreScreenState extends State<ExploreScreen>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPromoBanner() {
+    final List<String> bannerImages = [
+      'assets/images/lekhi_tutorials_banner.jpg',
+      'assets/images/lekhi_tutorials_banner1.jpg',
+      'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=400&fit=crop',
+    ];
+
+    return SizedBox(
+      height: 200,
+      child: PageView.builder(
+        itemCount: bannerImages.length,
+        controller: _bannerController,
+        onPageChanged: (index) {
+          setState(() {
+            _currentBannerPage = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withOpacity(0.2),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: SizedBox(
+                height: 200,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Background Image
+                    bannerImages[index].startsWith('http')
+                        ? Image.network(
+                            bannerImages[index],
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            height: 200,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildFallbackBanner();
+                            },
+                          )
+                        : Image.asset(
+                            bannerImages[index],
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                            height: 200,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildFallbackBanner();
+                            },
+                          ),
+                    // Page Indicator
+                    Positioned(
+                      bottom: 12,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          bannerImages.length,
+                          (dotIndex) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: _currentBannerPage == dotIndex ? 24 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _currentBannerPage == dotIndex
+                                  ? Colors.white
+                                  : Colors.white.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFallbackBanner() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor,
+            AppTheme.primaryColor.withOpacity(0.7),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.campaign_rounded, color: Colors.white, size: 48),
+            const SizedBox(height: 8),
+            Text(
+              'Advertise Your Coaching',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Reach thousands of students',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -717,9 +870,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
@@ -756,7 +907,9 @@ class _ExploreScreenState extends State<ExploreScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to start chat. Please try logging out and logging in again.'),
+              content: Text(
+                'Unable to start chat. Please try logging out and logging in again.',
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
@@ -936,10 +1089,7 @@ class _AnimatedSubjectCard extends StatefulWidget {
   final Subject subject;
   final int index;
 
-  const _AnimatedSubjectCard({
-    required this.subject,
-    required this.index,
-  });
+  const _AnimatedSubjectCard({required this.subject, required this.index});
 
   @override
   State<_AnimatedSubjectCard> createState() => _AnimatedSubjectCardState();
@@ -960,19 +1110,15 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.elasticOut,
-      ),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
-    _slideAnimation = Tween<double>(begin: 50.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _slideAnimation = Tween<double>(
+      begin: 50.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
 
     // Start animation
     Future.delayed(Duration(milliseconds: widget.index * 100), () {
@@ -1017,7 +1163,9 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: widget.subject.color.withOpacity(_isHovered ? 0.4 : 0.2),
+                        color: widget.subject.color.withOpacity(
+                          _isHovered ? 0.4 : 0.2,
+                        ),
                         blurRadius: _isHovered ? 20 : 12,
                         offset: Offset(0, _isHovered ? 12 : 6),
                       ),
