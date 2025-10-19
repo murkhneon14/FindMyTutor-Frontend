@@ -28,7 +28,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _isLoadingLocation = false;
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
-  String? _selectedSubject;
+  List<String> _selectedSubjects = []; // Changed to support multiple subjects
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
@@ -214,8 +214,8 @@ class _ExploreScreenState extends State<ExploreScreen>
         'latitude': _currentLocation!.latitude,
         'longitude': _currentLocation!.longitude,
         'radius': _searchRadius,
-        if (_selectedSubject != null && _selectedSubject!.isNotEmpty)
-          'subject': _selectedSubject,
+        if (_selectedSubjects.isNotEmpty)
+          'subject': _selectedSubjects, // Send array of subjects
         'page': 1,
         'limit': 20,
       };
@@ -685,63 +685,62 @@ class _ExploreScreenState extends State<ExploreScreen>
           ),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: isDarkMode ? Colors.grey[800] : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDarkMode
-                  ? Colors.grey[700]!
-                  : Colors.grey.withOpacity(0.3),
+        // Subject Filter - Multi-select with chips
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _subjects.map((subject) {
+                final isSelected = _selectedSubjects.contains(subject.name);
+                return FilterChip(
+                  label: Text(subject.name),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedSubjects.add(subject.name);
+                      } else {
+                        _selectedSubjects.remove(subject.name);
+                      }
+                    });
+                  },
+                  backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                  selectedColor: subject.color.withOpacity(0.3),
+                  checkmarkColor: subject.color,
+                  labelStyle: TextStyle(
+                    color: isSelected
+                        ? subject.color
+                        : (isDarkMode ? Colors.white70 : Colors.black87),
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? subject.color
+                        : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
+                    width: isSelected ? 2 : 1,
+                  ),
+                );
+              }).toList(),
             ),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedSubject,
-              dropdownColor: isDarkMode ? Colors.grey[900] : Colors.white,
-              icon: Icon(
-                Icons.arrow_drop_down,
-                color: isDarkMode ? Colors.white70 : Colors.black87,
-              ),
-              hint: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'All Subjects',
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.white70 : Colors.black87,
+            if (_selectedSubjects.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedSubjects.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.clear_all, size: 16),
+                  label: const Text('Clear All'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
                   ),
                 ),
               ),
-              isExpanded: true,
-              items: [
-                DropdownMenuItem<String>(
-                  value: null,
-                  child: Text(
-                    'All Subjects',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white70 : Colors.black87,
-                    ),
-                  ),
-                ),
-                ..._subjects.map(
-                  (subject) => DropdownMenuItem<String>(
-                    value: subject.name,
-                    child: Text(
-                      subject.name,
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.white70 : Colors.black87,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  _selectedSubject = value;
-                });
-              },
-            ),
-          ),
+          ],
         ),
         const SizedBox(height: 24),
 
