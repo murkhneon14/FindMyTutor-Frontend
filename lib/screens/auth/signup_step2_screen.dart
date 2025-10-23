@@ -46,6 +46,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   Position? _currentLocation;
   bool _isLoadingLocation = false;
   String? _locationError;
+  List<String> _selectedSubjects = [];
+  List<String> _selectedPreferredClasses = [];
   final List<String> _subjects = [
     'Mathematics',
     'Science',
@@ -206,7 +208,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             'gender': _selectedGender!.toLowerCase(),
             'qualifications': _instituteController.text.trim(),
             'experience': _experienceController.text.trim(),
-            'subjects': [_subjectController.text.trim()],
+            'subjects': _selectedSubjects.isNotEmpty ? _selectedSubjects : [_subjectController.text.trim()],
+            'preferredClasses': _selectedPreferredClasses,
             'fees': 0,
             'timings': 'flexible',
             'latitude': _currentLocation?.latitude ?? 28.6139, // Delhi latitude for testing
@@ -528,6 +531,26 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                 }
                                 return null;
                               },
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            // Multi-select Subjects
+                            _buildMultiSelectField(
+                              label: 'Subjects (Multiple)',
+                              hint: 'Tap to select multiple subjects',
+                              icon: Icons.library_books_outlined,
+                              selectedItems: _selectedSubjects,
+                              onTap: () => _showMultiSubjectPicker(context),
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            // Preferred Classes
+                            _buildMultiSelectField(
+                              label: 'Preferred Classes/Grades',
+                              hint: 'Tap to select preferred classes',
+                              icon: Icons.school_outlined,
+                              selectedItems: _selectedPreferredClasses,
+                              onTap: () => _showPreferredClassesPicker(context),
                             ),
                             const SizedBox(height: 20),
                             
@@ -1081,6 +1104,280 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
           ),
         ],
       ),
+    );
+  }
+
+  // Multi-select Subject Picker
+  void _showMultiSubjectPicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<List<String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildMultiPickerSheet(
+        'Select Subjects',
+        _subjects,
+        _selectedSubjects,
+      ),
+    );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedSubjects = selected;
+      });
+    }
+  }
+
+  // Multi-select Preferred Classes Picker
+  void _showPreferredClassesPicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<List<String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildMultiPickerSheet(
+        'Select Preferred Classes',
+        _grades,
+        _selectedPreferredClasses,
+      ),
+    );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedPreferredClasses = selected;
+      });
+    }
+  }
+
+  // Multi-select Picker Sheet
+  Widget _buildMultiPickerSheet(String title, List<String> items, List<String> selectedItems) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    List<String> tempSelected = List.from(selectedItems);
+    
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode 
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(20),
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setModalState(() {
+                        tempSelected.clear();
+                      });
+                    },
+                    child: const Text('Clear All'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (tempSelected.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${tempSelected.length} selected',
+                    style: const TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final isSelected = tempSelected.contains(item);
+                    return CheckboxListTile(
+                      title: Text(
+                        item,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                        ),
+                      ),
+                      value: isSelected,
+                      activeColor: AppTheme.primaryColor,
+                      onChanged: (bool? value) {
+                        setModalState(() {
+                          if (value == true) {
+                            tempSelected.add(item);
+                          } else {
+                            tempSelected.remove(item);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, tempSelected),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Done (${tempSelected.length} selected)',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Multi-select Field Builder
+  Widget _buildMultiSelectField({
+    required String label,
+    required String hint,
+    required IconData icon,
+    required List<String> selectedItems,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      color: AppTheme.primaryColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        selectedItems.isEmpty ? hint : '${selectedItems.length} selected',
+                        style: TextStyle(
+                          color: selectedItems.isEmpty
+                              ? Colors.grey[500]
+                              : AppTheme.textPrimary,
+                          fontWeight: selectedItems.isEmpty
+                              ? FontWeight.normal
+                              : FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      size: 16,
+                      color: Colors.grey[400],
+                    ),
+                  ],
+                ),
+                if (selectedItems.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: selectedItems.map((item) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppTheme.primaryColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Text(
+                          item,
+                          style: const TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

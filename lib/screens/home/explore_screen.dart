@@ -29,6 +29,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
   List<String> _selectedSubjects = []; // Changed to support multiple subjects
+  List<String> _selectedPreferredClasses = []; // Filter by preferred classes/grades
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
@@ -216,6 +217,8 @@ class _ExploreScreenState extends State<ExploreScreen>
         'radius': _searchRadius,
         if (_selectedSubjects.isNotEmpty)
           'subject': _selectedSubjects, // Send array of subjects
+        if (_selectedPreferredClasses.isNotEmpty)
+          'preferredClass': _selectedPreferredClasses, // Send array of preferred classes
         'page': 1,
         'limit': 20,
       };
