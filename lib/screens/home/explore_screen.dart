@@ -300,19 +300,26 @@ class _ExploreScreenState extends State<ExploreScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            _buildPromoBanner(),
-            const SizedBox(height: 16),
-            _buildTabBar(),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [_buildPopularTab(), _buildSearchTab()],
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerBoxIsScrolled) {
+            return [
+              SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    _buildHeader(),
+                    _buildPromoBanner(),
+                    const SizedBox(height: 16),
+                    _buildTabBar(),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ];
+          },
+          body: TabBarView(
+            controller: _tabController,
+            children: [_buildPopularTab(), _buildSearchTab()],
+          ),
         ),
       ),
     );
@@ -585,28 +592,31 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Widget _buildPopularTab() {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 0.85,
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(20),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.85,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return _AnimatedSubjectCard(
+                  subject: _subjects[index],
+                  index: index,
+                );
+              },
+              childCount: _subjects.length,
+            ),
           ),
-          itemCount: _subjects.length,
-          itemBuilder: (context, index) {
-            return _AnimatedSubjectCard(
-              subject: _subjects[index],
-              index: index,
-            );
-          },
         ),
-        const SizedBox(height: 20),
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 20),
+        ),
       ],
     );
   }
@@ -614,219 +624,225 @@ class _ExploreScreenState extends State<ExploreScreen>
   Widget _buildSearchTab() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        const SizedBox(height: 20),
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(20),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              const SizedBox(height: 20),
 
-        // Location Status
-        if (_currentLocation != null)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? AppTheme.successColor.withOpacity(0.15)
-                  : AppTheme.successColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.location_on,
-                  color: AppTheme.successColor,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Searching near: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.successColor,
-                      fontWeight: FontWeight.w500,
-                    ),
+              // Location Status
+              if (_currentLocation != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? AppTheme.successColor.withOpacity(0.15)
+                        : AppTheme.successColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: AppTheme.successColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Searching near: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.successColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-        const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-        // Search Radius Slider
-        Text(
-          'Search Radius: ${_searchRadius.toStringAsFixed(1)} km',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
-          ),
-        ),
-        Slider(
-          value: _searchRadius,
-          min: 1,
-          max: 50,
-          divisions: 49,
-          label: '${_searchRadius.toStringAsFixed(1)} km',
-          activeColor: AppTheme.primaryColor,
-          inactiveColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
-          onChanged: (value) {
-            setState(() {
-              _searchRadius = value;
-            });
-          },
-        ),
-        const SizedBox(height: 16),
-
-        // Subject Filter
-        Text(
-          'Filter by Subject',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Subject Filter - Multi-select with chips
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _subjects.map((subject) {
-                final isSelected = _selectedSubjects.contains(subject.name);
-                return FilterChip(
-                  label: Text(subject.name),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedSubjects.add(subject.name);
-                      } else {
-                        _selectedSubjects.remove(subject.name);
-                      }
-                    });
-                  },
-                  backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                  selectedColor: subject.color.withOpacity(0.3),
-                  checkmarkColor: subject.color,
-                  labelStyle: TextStyle(
-                    color: isSelected
-                        ? subject.color
-                        : (isDarkMode ? Colors.white70 : Colors.black87),
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                  side: BorderSide(
-                    color: isSelected
-                        ? subject.color
-                        : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
-                    width: isSelected ? 2 : 1,
-                  ),
-                );
-              }).toList(),
-            ),
-            if (_selectedSubjects.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: TextButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _selectedSubjects.clear();
-                    });
-                  },
-                  icon: const Icon(Icons.clear_all, size: 16),
-                  label: const Text('Clear All'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // Search Button
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _isSearching ? null : _searchNearbyTeachers,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-              disabledBackgroundColor: AppTheme.primaryColor.withOpacity(0.5),
-            ),
-            child: _isSearching
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text(
-                    'Search Teachers',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Search Results
-        if (_searchResults.isNotEmpty)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              // Search Radius Slider
               Text(
-                '${_searchResults.length} Teachers Found',
+                'Search Radius: ${_searchRadius.toStringAsFixed(1)} km',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: isDarkMode ? Colors.white : AppTheme.textPrimary,
                 ),
               ),
+              Slider(
+                value: _searchRadius,
+                min: 1,
+                max: 100,
+                divisions: 99,
+                label: '${_searchRadius.toStringAsFixed(1)} km',
+                activeColor: AppTheme.primaryColor,
+                inactiveColor: isDarkMode ? Colors.grey[600] : Colors.grey[300],
+                onChanged: (value) {
+                  setState(() {
+                    _searchRadius = value;
+                  });
+                },
+              ),
               const SizedBox(height: 16),
-              ..._searchResults
-                  .map((teacher) => _buildTeacherCard(teacher))
-                  .toList(),
-            ],
-          )
-        else if (_isSearching)
-          const Center(child: CircularProgressIndicator())
-        else if (_searchController.text.isNotEmpty)
-          Center(
-            child: Column(
-              children: [
-                Icon(
-                  Icons.search_off,
-                  size: 64,
-                  color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+
+              // Subject Filter
+              Text(
+                'Filter by Subject',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? Colors.white : AppTheme.textPrimary,
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'No teachers found',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: isDarkMode ? Colors.white70 : Colors.grey[600],
+              ),
+              const SizedBox(height: 8),
+              // Subject Filter - Multi-select with chips
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _subjects.map((subject) {
+                      final isSelected = _selectedSubjects.contains(subject.name);
+                      return FilterChip(
+                        label: Text(subject.name),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedSubjects.add(subject.name);
+                            } else {
+                              _selectedSubjects.remove(subject.name);
+                            }
+                          });
+                        },
+                        backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                        selectedColor: subject.color.withOpacity(0.3),
+                        checkmarkColor: subject.color,
+                        labelStyle: TextStyle(
+                          color: isSelected
+                              ? subject.color
+                              : (isDarkMode ? Colors.white70 : Colors.black87),
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: isSelected
+                              ? subject.color
+                              : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
+                          width: isSelected ? 2 : 1,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  if (_selectedSubjects.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _selectedSubjects.clear();
+                          });
+                        },
+                        icon: const Icon(Icons.clear_all, size: 16),
+                        label: const Text('Clear All'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Search Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSearching ? null : _searchNearbyTeachers,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppTheme.primaryColor.withOpacity(0.5),
+                  ),
+                  child: _isSearching
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Search Teachers',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Search Results
+              if (_searchResults.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_searchResults.length} Teachers Found',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    ..._searchResults
+                        .map((teacher) => _buildTeacherCard(teacher))
+                        .toList(),
+                  ],
+                )
+              else if (_isSearching)
+                const Center(child: CircularProgressIndicator())
+              else if (_searchController.text.isNotEmpty)
+                Center(
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.search_off,
+                        size: 64,
+                        color: isDarkMode ? Colors.grey[600] : Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No teachers found',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isDarkMode ? Colors.white70 : Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Try adjusting your search radius or filters',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Try adjusting your search radius or filters',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
+            ]),
           ),
+        ),
       ],
     );
   }
