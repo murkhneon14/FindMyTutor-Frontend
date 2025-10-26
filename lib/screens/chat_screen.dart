@@ -30,7 +30,8 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final ChatService _chatService = ChatService();
   final SocketService _socketService = SocketService();
-  final GlobalNotificationManager _notificationManager = GlobalNotificationManager();
+  final GlobalNotificationManager _notificationManager =
+      GlobalNotificationManager();
   final List<types.Message> _messages = [];
   late types.User _currentUser;
   late types.User _otherUser;
@@ -61,7 +62,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!_socketService.isConnected) {
       print('Connecting to socket: ${ApiConfig.socketUrl}');
       _socketService.connect(ApiConfig.socketUrl, widget.currentUserId);
-      
+
       // Wait a bit for connection to establish, then join chat
       Future.delayed(const Duration(milliseconds: 500), () {
         if (_socketService.isConnected) {
@@ -108,7 +109,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadMessages() async {
-    final messages = await _chatService.getChatMessages(widget.chatId);
+    final messages = await _chatService.getChatMessages(
+      widget.chatId,
+      userId: widget.currentUserId,
+    );
     setState(() {
       _messages.clear();
       for (var msg in messages.reversed) {
@@ -120,10 +124,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   types.Message _convertToFlutterChatMessage(ChatMessage message) {
     return types.TextMessage(
-      author: types.User(
-        id: message.senderId,
-        firstName: message.senderName,
-      ),
+      author: types.User(id: message.senderId, firstName: message.senderName),
       createdAt: message.createdAt.millisecondsSinceEpoch,
       id: message.id,
       text: message.text,
@@ -173,7 +174,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'text': message.text,
         'type': 'text',
       });
-      
+
       // Update status to sent after a short delay (socket doesn't return confirmation immediately)
       Future.delayed(const Duration(milliseconds: 500), () {
         final index = _messages.indexWhere((m) => m.id == textMessage.id);
@@ -195,7 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
           senderId: widget.currentUserId,
           text: message.text,
         );
-        
+
         if (sentMessage != null) {
           // Remove the temporary message and add the real one from server
           final index = _messages.indexWhere((m) => m.id == textMessage.id);
@@ -232,9 +233,7 @@ class _ChatScreenState extends State<ChatScreen> {
         // Update status to error
         final index = _messages.indexWhere((m) => m.id == textMessage.id);
         if (index != -1 && mounted) {
-          final errorMessage = textMessage.copyWith(
-            status: types.Status.error,
-          );
+          final errorMessage = textMessage.copyWith(status: types.Status.error);
           setState(() {
             _messages[index] = errorMessage;
           });
@@ -276,16 +275,10 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_isOtherUserTyping)
               const Text(
                 'typing...',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
               )
             else
-              Text(
-                widget.otherUser.role,
-                style: const TextStyle(fontSize: 12),
-              ),
+              Text(widget.otherUser.role, style: const TextStyle(fontSize: 12)),
           ],
         ),
         elevation: 1,
@@ -329,18 +322,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'No messages yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Start the conversation!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                     ),
                   ],
                 ),

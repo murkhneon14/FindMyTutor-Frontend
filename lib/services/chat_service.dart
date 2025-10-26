@@ -6,36 +6,34 @@ import '../models/chat_message.dart';
 import '../config/api.dart';
 
 class ChatService {
-
   // Get or create a chat between two users
   Future<ChatRoom?> getOrCreateChat(String userId, String otherUserId) async {
     try {
       print('💬 ========== CREATING CHAT ==========');
       print('💬 Your user ID: $userId');
       print('💬 Other user ID: $otherUserId');
-      
+
       // Get auth token
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      
+
       if (token == null) {
         print('❌ No auth token found');
-        throw Exception('AUTH_ERROR: No authentication token found. Please login again.');
+        throw Exception(
+          'AUTH_ERROR: No authentication token found. Please login again.',
+        );
       }
-      
+
       print('💬 Auth token: ${token.substring(0, 20)}...');
       print('💬 Endpoint: ${ApiConfig.chatCreate}');
-      
+
       final response = await http.post(
         Uri.parse(ApiConfig.chatCreate),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'userId': userId,
-          'otherUserId': otherUserId,
-        }),
+        body: jsonEncode({'userId': userId, 'otherUserId': otherUserId}),
       );
 
       print('💬 Chat creation response: ${response.statusCode}');
@@ -56,9 +54,15 @@ class ChatService {
         print('❌ Error: $message');
         print('❌ Your user ID: $userId');
         print('❌ Other user ID: $otherUserId');
-        print('⚠️ This means one or both users do not exist in the backend database.');
-        print('⚠️ Solution: Both users need to complete their profile setup (student/teacher profile).');
-        throw Exception('USER_NOT_FOUND: One or both users have not completed their profile. Please ensure both users have filled out their student or teacher profile.');
+        print(
+          '⚠️ This means one or both users do not exist in the backend database.',
+        );
+        print(
+          '⚠️ Solution: Both users need to complete their profile setup (student/teacher profile).',
+        );
+        throw Exception(
+          'USER_NOT_FOUND: One or both users have not completed their profile. Please ensure both users have filled out their student or teacher profile.',
+        );
       } else {
         final data = jsonDecode(response.body);
         final message = data['message'] ?? 'Failed to create chat';
@@ -79,15 +83,13 @@ class ChatService {
       // Get auth token
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-      
+
+      final headers = <String, String>{'Content-Type': 'application/json'};
+
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
       }
-      
+
       final response = await http.get(
         Uri.parse(ApiConfig.chatUser(userId)),
         headers: headers,
@@ -110,6 +112,7 @@ class ChatService {
   // Get messages from a specific chat
   Future<List<ChatMessage>> getChatMessages(
     String chatId, {
+    required String userId,
     int limit = 50,
     int skip = 0,
   }) async {
@@ -117,17 +120,17 @@ class ChatService {
       // Get auth token
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-      
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-      };
-      
+
+      final headers = <String, String>{'Content-Type': 'application/json'};
+
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
       }
-      
+
       final response = await http.get(
-        Uri.parse('${ApiConfig.chatMessages(chatId)}?limit=$limit&skip=$skip'),
+        Uri.parse(
+          '${ApiConfig.chatMessages(chatId)}?userId=$userId&limit=$limit&skip=$skip',
+        ),
         headers: headers,
       );
 
@@ -189,10 +192,7 @@ class ChatService {
       final response = await http.put(
         Uri.parse(ApiConfig.chatMarkAsRead),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'chatId': chatId,
-          'userId': userId,
-        }),
+        body: jsonEncode({'chatId': chatId, 'userId': userId}),
       );
 
       return response.statusCode == 200;
