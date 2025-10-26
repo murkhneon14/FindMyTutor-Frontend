@@ -188,7 +188,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     setState(() => _isLoadingLocation = true);
     try {
       final position = await LocationService.getCurrentLocation();
-      if (position != null) {
+      if (position != null && mounted) {
         setState(() {
           _currentLocation = position;
         });
@@ -196,7 +196,9 @@ class _ExploreScreenState extends State<ExploreScreen>
     } catch (e) {
       print('Error getting location: $e');
     } finally {
-      setState(() => _isLoadingLocation = false);
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
     }
   }
 
@@ -1218,50 +1220,73 @@ class _ExploreScreenState extends State<ExploreScreen>
       // Close loading dialog
       if (mounted) Navigator.of(context).pop();
 
-      if (chatRoom != null) {
-        // Navigate to chat screen
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                chatId: chatRoom.id,
-                currentUserId: _currentUserId!,
-                currentUserName: _currentUserName!,
-                otherUser: ChatUser(
-                  id: teacherId,
-                  name: teacherName,
-                  email: teacherEmail,
-                  role: 'teacher',
-                ),
+      // Navigate to chat screen
+      if (mounted && chatRoom != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              chatId: chatRoom.id,
+              currentUserId: _currentUserId!,
+              currentUserName: _currentUserName!,
+              otherUser: ChatUser(
+                id: teacherId,
+                name: teacherName,
+                email: teacherEmail,
+                role: 'teacher',
               ),
             ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Unable to start chat. Please try logging out and logging in again.',
-              ),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
+          ),
+        );
       }
     } catch (e) {
       // Close loading dialog
       if (mounted) Navigator.of(context).pop();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final errorMessage = e.toString();
+        
+        // Check if it's a premium subscription error
+        if (errorMessage.contains('PREMIUM_REQUIRED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Premium subscription required to message teachers',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Subscribe',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SubscriptionScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        } else if (errorMessage.contains('USER_NOT_FOUND')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Profile not found. Please ensure both you and the teacher have completed profile setup.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 6),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${errorMessage.replaceAll('Exception: CHAT_ERROR: ', '').replaceAll('Exception: ', '')}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -1479,50 +1504,73 @@ class _ExploreScreenState extends State<ExploreScreen>
       // Close loading dialog
       if (mounted) Navigator.of(context).pop();
 
-      if (chatRoom != null) {
-        // Navigate to chat screen
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatScreen(
-                chatId: chatRoom.id,
-                currentUserId: _currentUserId!,
-                currentUserName: _currentUserName!,
-                otherUser: ChatUser(
-                  id: studentId,
-                  name: studentName,
-                  email: studentEmail,
-                  role: 'student',
-                ),
+      // Navigate to chat screen
+      if (mounted && chatRoom != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              chatId: chatRoom.id,
+              currentUserId: _currentUserId!,
+              currentUserName: _currentUserName!,
+              otherUser: ChatUser(
+                id: studentId,
+                name: studentName,
+                email: studentEmail,
+                role: 'student',
               ),
             ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Unable to start chat. Please try logging out and logging in again.',
-              ),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        }
+          ),
+        );
       }
     } catch (e) {
       // Close loading dialog
       if (mounted) Navigator.of(context).pop();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final errorMessage = e.toString();
+        
+        // Check if it's a premium subscription error
+        if (errorMessage.contains('PREMIUM_REQUIRED')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Premium subscription required to message students',
+              ),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Subscribe',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SubscriptionScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        } else if (errorMessage.contains('USER_NOT_FOUND')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Profile not found. Please ensure both you and the student have completed profile setup.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 6),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${errorMessage.replaceAll('Exception: CHAT_ERROR: ', '').replaceAll('Exception: ', '')}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

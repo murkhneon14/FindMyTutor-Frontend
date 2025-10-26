@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_room.dart';
 import '../models/chat_message.dart';
 import '../config/api.dart';
@@ -9,40 +10,87 @@ class ChatService {
   // Get or create a chat between two users
   Future<ChatRoom?> getOrCreateChat(String userId, String otherUserId) async {
     try {
-      print('Creating chat: userId=$userId, otherUserId=$otherUserId');
+      print('💬 ========== CREATING CHAT ==========');
+      print('💬 Your user ID: $userId');
+      print('💬 Other user ID: $otherUserId');
+      
+      // Get auth token
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      if (token == null) {
+        print('❌ No auth token found');
+        throw Exception('AUTH_ERROR: No authentication token found. Please login again.');
+      }
+      
+      print('💬 Auth token: ${token.substring(0, 20)}...');
+      print('💬 Endpoint: ${ApiConfig.chatCreate}');
+      
       final response = await http.post(
         Uri.parse(ApiConfig.chatCreate),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({
           'userId': userId,
           'otherUserId': otherUserId,
         }),
       );
 
-      print('Chat creation response: ${response.statusCode} - ${response.body}');
+      print('💬 Chat creation response: ${response.statusCode}');
+      print('💬 Response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
+        print('✅ Chat created successfully');
         return ChatRoom.fromJson(data['chat']);
-      } else {
-        print('❌ Error creating chat: ${response.body}');
+      } else if (response.statusCode == 403) {
+        final data = jsonDecode(response.body);
+        final message = data['message'] ?? 'Premium subscription required';
+        print('❌ Premium subscription required: $message');
+        throw Exception('PREMIUM_REQUIRED: $message');
+      } else if (response.statusCode == 404) {
+        final data = jsonDecode(response.body);
+        final message = data['message'] ?? 'User not found';
+        print('❌ Error: $message');
         print('❌ Your user ID: $userId');
         print('❌ Other user ID: $otherUserId');
-        print('⚠️ One of these users does not exist in the backend database');
-        return null;
+        print('⚠️ This means one or both users do not exist in the backend database.');
+        print('⚠️ Solution: Both users need to complete their profile setup (student/teacher profile).');
+        throw Exception('USER_NOT_FOUND: One or both users have not completed their profile. Please ensure both users have filled out their student or teacher profile.');
+      } else {
+        final data = jsonDecode(response.body);
+        final message = data['message'] ?? 'Failed to create chat';
+        print('❌ Error creating chat: $message');
+        print('❌ Your user ID: $userId');
+        print('❌ Other user ID: $otherUserId');
+        throw Exception('CHAT_ERROR: $message');
       }
     } catch (e) {
-      print('Error in getOrCreateChat: $e');
-      return null;
+      print('❌ Exception in getOrCreateChat: $e');
+      rethrow;
     }
   }
 
   // Get all chats for a user
   Future<List<ChatRoom>> getUserChats(String userId) async {
     try {
+      // Get auth token
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      
       final response = await http.get(
         Uri.parse(ApiConfig.chatUser(userId)),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -66,9 +114,21 @@ class ChatService {
     int skip = 0,
   }) async {
     try {
+      // Get auth token
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      
       final response = await http.get(
         Uri.parse('${ApiConfig.chatMessages(chatId)}?limit=$limit&skip=$skip'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
