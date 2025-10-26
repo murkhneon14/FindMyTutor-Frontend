@@ -82,10 +82,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   void initState() {
     super.initState();
     _isTeacher = widget.userType == 'teacher';
-    // Get location for teachers automatically
-    if (_isTeacher) {
-      _getCurrentLocation();
-    }
+    // Get location automatically for both teachers and students
+    _getCurrentLocation();
   }
 
   @override
@@ -202,6 +200,18 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             return;
           }
 
+          // Check if location is available
+          if (_currentLocation == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please enable location to complete your profile'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            return;
+          }
+
           final teacherData = {
             'phone': _phoneController.text.trim(),
             'dob': _selectedDob?.toIso8601String(),
@@ -212,8 +222,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             'preferredClasses': _selectedPreferredClasses,
             'fees': 0,
             'timings': 'flexible',
-            'latitude': _currentLocation?.latitude ?? 28.6139, // Delhi latitude for testing
-            'longitude': _currentLocation?.longitude ?? 77.2090, // Delhi longitude for testing
+            'latitude': _currentLocation!.latitude,
+            'longitude': _currentLocation!.longitude,
             'documents': [],
           };
           
@@ -225,19 +235,38 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             body: jsonEncode(teacherData),
           );
         } else {
+          // Check if location is available for student
+          if (_currentLocation == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please enable location to complete your profile'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            return;
+          }
+
+          // Student profile with location
+          final studentData = {
+            'phone': _phoneController.text.trim(),
+            'dob': _selectedDob?.toIso8601String(),
+            'gender': (_selectedGender ?? '').toLowerCase(),
+            'classGrade': _gradeController.text.trim(),
+            'schoolName': _instituteController.text.trim(),
+            'guardianName': _guardianNameController.text.trim().isEmpty ? null : _guardianNameController.text.trim(),
+            'learningGoals': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
+            'address': _addressController.text.trim(),
+            'latitude': _currentLocation!.latitude,
+            'longitude': _currentLocation!.longitude,
+          };
+          
+          debugPrint('Sending student profile data: ${jsonEncode(studentData)}');
+          
           response = await http.post(
             Uri.parse(ApiConfig.studentProfile),
             headers: headers,
-            body: jsonEncode({
-              'phone': _phoneController.text.trim(),
-              'dob': _selectedDob?.toIso8601String(),
-              'gender': (_selectedGender ?? '').toLowerCase(),
-              'classGrade': _gradeController.text.trim(),
-              'schoolName': _instituteController.text.trim(),
-              'guardianName': _guardianNameController.text.trim().isEmpty ? null : _guardianNameController.text.trim(),
-              'learningGoals': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
-              'address': _addressController.text.trim(),
-            }),
+            body: jsonEncode(studentData),
           );
         }
 
@@ -734,6 +763,101 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                               label: 'Guardian Name (if under 18)',
                               hint: 'Enter guardian name',
                               icon: Icons.person_outline,
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            // Location Section for Students
+                            Text(
+                              'Location',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _currentLocation != null 
+                                      ? AppTheme.successColor.withOpacity(0.3)
+                                      : Colors.grey.withOpacity(0.3),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _currentLocation != null 
+                                            ? Icons.location_on 
+                                            : Icons.location_off,
+                                        color: _currentLocation != null 
+                                            ? AppTheme.successColor 
+                                            : Colors.grey,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _currentLocation != null
+                                                  ? 'Location Obtained'
+                                                  : _locationError ?? 'Location Required',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                color: _currentLocation != null 
+                                                    ? AppTheme.successColor 
+                                                    : Colors.grey[700],
+                                              ),
+                                            ),
+                                            if (_currentLocation != null)
+                                              Text(
+                                                'Lat: ${_currentLocation!.latitude.toStringAsFixed(4)}, Lon: ${_currentLocation!.longitude.toStringAsFixed(4)}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (_isLoadingLocation)
+                                        const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      else
+                                        IconButton(
+                                          icon: const Icon(Icons.refresh),
+                                          onPressed: _getCurrentLocation,
+                                          color: AppTheme.primaryColor,
+                                          tooltip: 'Refresh Location',
+                                        ),
+                                    ],
+                                  ),
+                                  if (_locationError != null && _currentLocation == null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        'Tap refresh to get your location. This helps teachers find you.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 20),
                             

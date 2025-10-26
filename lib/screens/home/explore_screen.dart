@@ -29,7 +29,8 @@ class _ExploreScreenState extends State<ExploreScreen>
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
   List<String> _selectedSubjects = []; // Changed to support multiple subjects
-  List<String> _selectedPreferredClasses = []; // Filter by preferred classes/grades
+  List<String> _selectedPreferredClasses =
+      []; // Filter by preferred classes/grades
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
@@ -110,6 +111,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     final prefs = await SharedPreferences.getInstance();
     String? userId = prefs.getString('user_id');
     String? userName = prefs.getString('user_name');
+    String? userRole = prefs.getString('user_role');
 
     // If user data is not in SharedPreferences, try to fetch it from the API
     if (userId == null || userName == null) {
@@ -131,7 +133,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             userId = user['_id']?.toString() ?? user['id']?.toString();
             userName = user['name']?.toString();
             final userEmail = user['email']?.toString();
-            final userRole = user['role']?.toString();
+            userRole = user['role']?.toString();
 
             // Save to SharedPreferences for future use
             if (userId != null) await prefs.setString('user_id', userId);
@@ -140,28 +142,24 @@ class _ExploreScreenState extends State<ExploreScreen>
               await prefs.setString('user_email', userEmail);
             if (userRole != null) await prefs.setString('user_role', userRole);
 
-            print('Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole');
+            print(
+              'Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole',
+            );
           }
         } catch (e) {
           print('Error fetching user data: $e');
         }
       }
-      
-      // Also load role from SharedPreferences
-      final role = prefs.getString('user_role');
-      
-      setState(() {
-        _currentUserId = userId;
-        _currentUserName = userName;
-        _userRole = role;
-      });
-    } else {
-      setState(() {
-        _currentUserId = userId;
-        _currentUserName = userName;
-        _userRole = null;
-      });
     }
+
+    // Always set the state with the loaded or fetched data
+    setState(() {
+      _currentUserId = userId;
+      _currentUserName = userName;
+      _userRole = userRole;
+    });
+
+    print('User role loaded: $_userRole');
   }
 
   @override
@@ -229,14 +227,13 @@ class _ExploreScreenState extends State<ExploreScreen>
         if (_selectedSubjects.isNotEmpty)
           'subject': _selectedSubjects, // Send array of subjects
         if (_selectedPreferredClasses.isNotEmpty)
-          'preferredClass': _selectedPreferredClasses, // Send array of preferred classes
+          'preferredClass':
+              _selectedPreferredClasses, // Send array of preferred classes
         'page': 1,
         'limit': 20,
       };
 
-      print(
-        'Sending request to: ${ApiConfig.nearbyTeachers}',
-      );
+      print('Sending request to: ${ApiConfig.nearbyTeachers}');
       print('Request body: $requestBody');
 
       final response = await http.post(
@@ -351,9 +348,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         'limit': 20,
       };
 
-      print(
-        'Sending request to: ${ApiConfig.nearbyStudents}',
-      );
+      print('Sending request to: ${ApiConfig.nearbyStudents}');
       print('Request body: $requestBody');
 
       final response = await http.post(
@@ -727,20 +722,15 @@ class _ExploreScreenState extends State<ExploreScreen>
               mainAxisSpacing: 16,
               childAspectRatio: 0.85,
             ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                return _AnimatedSubjectCard(
-                  subject: _subjects[index],
-                  index: index,
-                );
-              },
-              childCount: _subjects.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              return _AnimatedSubjectCard(
+                subject: _subjects[index],
+                index: index,
+              );
+            }, childCount: _subjects.length),
           ),
         ),
-        const SliverToBoxAdapter(
-          child: SizedBox(height: 20),
-        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 20)),
       ],
     );
   }
@@ -765,7 +755,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                         ? AppTheme.successColor.withOpacity(0.15)
                         : AppTheme.successColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.successColor.withOpacity(0.3)),
+                    border: Border.all(
+                      color: AppTheme.successColor.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -816,7 +808,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               const SizedBox(height: 16),
 
               // Filter Section - Show subjects for students, class grades for teachers
-              if (_userRole != 'teacher') ..[
+              if (_userRole != 'teacher') ...[
                 // Subject Filter (for students)
                 Text(
                   'Filter by Subject',
@@ -834,7 +826,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                       spacing: 8,
                       runSpacing: 8,
                       children: _subjects.map((subject) {
-                        final isSelected = _selectedSubjects.contains(subject.name);
+                        final isSelected = _selectedSubjects.contains(
+                          subject.name,
+                        );
                         return FilterChip(
                           label: Text(subject.name),
                           selected: isSelected,
@@ -847,19 +841,27 @@ class _ExploreScreenState extends State<ExploreScreen>
                               }
                             });
                           },
-                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          backgroundColor: isDarkMode
+                              ? Colors.grey[800]
+                              : Colors.grey[200],
                           selectedColor: subject.color.withOpacity(0.3),
                           checkmarkColor: subject.color,
                           labelStyle: TextStyle(
                             color: isSelected
                                 ? subject.color
-                                : (isDarkMode ? Colors.white70 : Colors.black87),
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                : (isDarkMode
+                                      ? Colors.white70
+                                      : Colors.black87),
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
                           ),
                           side: BorderSide(
                             color: isSelected
                                 ? subject.color
-                                : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
+                                : (isDarkMode
+                                      ? Colors.grey[700]!
+                                      : Colors.grey[400]!),
                             width: isSelected ? 2 : 1,
                           ),
                         );
@@ -877,18 +879,22 @@ class _ExploreScreenState extends State<ExploreScreen>
                           icon: const Icon(Icons.clear_all, size: 16),
                           label: const Text('Clear All'),
                           style: TextButton.styleFrom(
-                            foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                            foregroundColor: isDarkMode
+                                ? Colors.white70
+                                : Colors.black87,
                           ),
                         ),
                       ),
                   ],
                 ),
               ],
-              
+
               // Class/Grade Filter (for both students and teachers)
               const SizedBox(height: 16),
               Text(
-                _userRole == 'teacher' ? 'Filter by Class/Grade' : 'Filter by Preferred Classes',
+                _userRole == 'teacher'
+                    ? 'Filter by Class/Grade'
+                    : 'Filter by Preferred Classes',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -902,53 +908,66 @@ class _ExploreScreenState extends State<ExploreScreen>
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: [
-                      'Pre-School',
-                      '1st Grade',
-                      '2nd Grade',
-                      '3rd Grade',
-                      '4th Grade',
-                      '5th Grade',
-                      '6th Grade',
-                      '7th Grade',
-                      '8th Grade',
-                      '9th Grade',
-                      '10th Grade',
-                      '11th Grade',
-                      '12th Grade',
-                      'College',
-                      'University',
-                    ].map((grade) {
-                      final isSelected = _selectedPreferredClasses.contains(grade);
-                      return FilterChip(
-                        label: Text(grade),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            if (selected) {
-                              _selectedPreferredClasses.add(grade);
-                            } else {
-                              _selectedPreferredClasses.remove(grade);
-                            }
-                          });
-                        },
-                        backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                        selectedColor: AppTheme.primaryColor.withOpacity(0.3),
-                        checkmarkColor: AppTheme.primaryColor,
-                        labelStyle: TextStyle(
-                          color: isSelected
-                              ? AppTheme.primaryColor
-                              : (isDarkMode ? Colors.white70 : Colors.black87),
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                        side: BorderSide(
-                          color: isSelected
-                              ? AppTheme.primaryColor
-                              : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
-                          width: isSelected ? 2 : 1,
-                        ),
-                      );
-                    }).toList(),
+                    children:
+                        [
+                          'Pre-School',
+                          '1st Grade',
+                          '2nd Grade',
+                          '3rd Grade',
+                          '4th Grade',
+                          '5th Grade',
+                          '6th Grade',
+                          '7th Grade',
+                          '8th Grade',
+                          '9th Grade',
+                          '10th Grade',
+                          '11th Grade',
+                          '12th Grade',
+                          'College',
+                          'University',
+                        ].map((grade) {
+                          final isSelected = _selectedPreferredClasses.contains(
+                            grade,
+                          );
+                          return FilterChip(
+                            label: Text(grade),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedPreferredClasses.add(grade);
+                                } else {
+                                  _selectedPreferredClasses.remove(grade);
+                                }
+                              });
+                            },
+                            backgroundColor: isDarkMode
+                                ? Colors.grey[800]
+                                : Colors.grey[200],
+                            selectedColor: AppTheme.primaryColor.withOpacity(
+                              0.3,
+                            ),
+                            checkmarkColor: AppTheme.primaryColor,
+                            labelStyle: TextStyle(
+                              color: isSelected
+                                  ? AppTheme.primaryColor
+                                  : (isDarkMode
+                                        ? Colors.white70
+                                        : Colors.black87),
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? AppTheme.primaryColor
+                                  : (isDarkMode
+                                        ? Colors.grey[700]!
+                                        : Colors.grey[400]!),
+                              width: isSelected ? 2 : 1,
+                            ),
+                          );
+                        }).toList(),
                   ),
                   if (_selectedPreferredClasses.isNotEmpty)
                     Padding(
@@ -962,7 +981,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                         icon: const Icon(Icons.clear_all, size: 16),
                         label: const Text('Clear All'),
                         style: TextButton.styleFrom(
-                          foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                          foregroundColor: isDarkMode
+                              ? Colors.white70
+                              : Colors.black87,
                         ),
                       ),
                     ),
@@ -977,8 +998,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                   onPressed: _isSearching
                       ? null
                       : (_userRole == 'teacher'
-                          ? _searchNearbyStudents
-                          : _searchNearbyTeachers),
+                            ? _searchNearbyStudents
+                            : _searchNearbyTeachers),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -986,7 +1007,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                     backgroundColor: AppTheme.primaryColor,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppTheme.primaryColor.withOpacity(0.5),
+                    disabledBackgroundColor: AppTheme.primaryColor.withOpacity(
+                      0.5,
+                    ),
                   ),
                   child: _isSearching
                       ? const SizedBox(
@@ -994,12 +1017,19 @@ class _ExploreScreenState extends State<ExploreScreen>
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Text(
-                          _userRole == 'teacher' ? 'Search Students' : 'Search Teachers',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          _userRole == 'teacher'
+                              ? 'Search Students'
+                              : 'Search Teachers',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                 ),
               ),
@@ -1022,9 +1052,11 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                     const SizedBox(height: 16),
                     ..._searchResults
-                        .map((result) => _userRole == 'teacher'
-                            ? _buildStudentCard(result)
-                            : _buildTeacherCard(result))
+                        .map(
+                          (result) => _userRole == 'teacher'
+                              ? _buildStudentCard(result)
+                              : _buildTeacherCard(result),
+                        )
                         .toList(),
                   ],
                 )
@@ -1052,7 +1084,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                         'Try adjusting your search radius or filters',
                         style: TextStyle(
                           fontSize: 14,
-                          color: isDarkMode ? Colors.grey[500] : Colors.grey[600],
+                          color: isDarkMode
+                              ? Colors.grey[500]
+                              : Colors.grey[600],
                         ),
                       ),
                     ],
@@ -1430,6 +1464,19 @@ class _ExploreScreenState extends State<ExploreScreen>
     final learningGoals = student['learningGoals']?.toString() ?? 'Not specified';
     final guardianName = student['guardianName']?.toString();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Calculate distance if location data is available
+    final studentLat = student['latitude'];
+    final studentLon = student['longitude'];
+    double? distance;
+    if (_currentLocation != null && studentLat != null && studentLon != null) {
+      distance = LocationService.calculateDistance(
+        _currentLocation!.latitude,
+        _currentLocation!.longitude,
+        studentLat is double ? studentLat : (studentLat as num).toDouble(),
+        studentLon is double ? studentLon : (studentLon as num).toDouble(),
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1487,6 +1534,40 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ],
                   ),
                 ),
+                if (distance != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.successColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: AppTheme.successColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.location_on,
+                          size: 14,
+                          color: AppTheme.successColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${distance.toStringAsFixed(1)} km',
+                          style: TextStyle(
+                            color: AppTheme.successColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -1541,7 +1622,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ),
                     ],
                   ),
-                  if (guardianName != null && guardianName.isNotEmpty) ..[
+                  if (guardianName != null && guardianName.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Row(
                       children: [
