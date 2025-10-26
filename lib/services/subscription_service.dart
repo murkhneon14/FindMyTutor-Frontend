@@ -26,12 +26,22 @@ class SubscriptionService {
   }
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    print('✅✅✅ PAYMENT SUCCESS ✅✅✅');
+    print('✅ Payment ID: ${response.paymentId}');
+    print('✅ Order ID: ${response.orderId}');
+    print('✅ Signature: ${response.signature}');
+    
     if (_onPaymentSuccess != null) {
       _onPaymentSuccess!(response);
     }
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    print('❌❌❌ PAYMENT ERROR ❌❌❌');
+    print('❌ Code: ${response.code}');
+    print('❌ Message: ${response.message}');
+    print('❌ Error: ${response.error}');
+    
     if (_onPaymentError != null) {
       _onPaymentError!(response);
     }
@@ -44,6 +54,9 @@ class SubscriptionService {
   // Create subscription
   Future<Map<String, dynamic>> createSubscription(String userId) async {
     try {
+      print('💳 Creating subscription for user: $userId');
+      print('💳 Endpoint: ${ApiConfig.subscriptionCreate}');
+      
       final response = await http.post(
         Uri.parse(ApiConfig.subscriptionCreate),
         headers: {'Content-Type': 'application/json'},
@@ -53,12 +66,17 @@ class SubscriptionService {
         }),
       );
 
+      print('💳 Response status: ${response.statusCode}');
+      print('💳 Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
+        print('❌ Failed to create subscription: ${response.body}');
         throw Exception('Failed to create subscription');
       }
     } catch (e) {
+      print('❌ Error creating subscription: $e');
       throw Exception('Error creating subscription: $e');
     }
   }
@@ -74,6 +92,12 @@ class SubscriptionService {
   }) {
     _onPaymentSuccess = onSuccess;
     _onPaymentError = onError;
+
+    print('💳 Opening Razorpay checkout');
+    print('💳 Subscription ID: $subscriptionId');
+    print('💳 Amount: $amount');
+    print('💳 Email: $userEmail');
+    print('💳 Name: $userName');
 
     var options = {
       'key': 'rzp_test_RY4swUGd5MvV6L', // Razorpay test key
@@ -93,8 +117,9 @@ class SubscriptionService {
 
     try {
       _razorpay.open(options);
+      print('✅ Razorpay checkout opened successfully');
     } catch (e) {
-      print('Error opening Razorpay: $e');
+      print('❌ Error opening Razorpay: $e');
     }
   }
 
@@ -106,16 +131,31 @@ class SubscriptionService {
     required String signature,
   }) async {
     try {
+      print('🔐 ========== VERIFYING PAYMENT ==========');
+      print('🔐 User ID: $userId');
+      print('🔐 Subscription ID: $subscriptionId');
+      print('🔐 Payment ID: $paymentId');
+      print('🔐 Signature: $signature');
+      print('🔐 Endpoint: ${ApiConfig.subscriptionVerify}');
+      
+      final requestBody = {
+        'userId': userId,
+        'razorpay_subscription_id': subscriptionId,
+        'razorpay_payment_id': paymentId,
+        'razorpay_signature': signature,
+      };
+      
+      print('🔐 Request Body: $requestBody');
+      
       final response = await http.post(
         Uri.parse(ApiConfig.subscriptionVerify),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'userId': userId,
-          'razorpay_subscription_id': subscriptionId,
-          'razorpay_payment_id': paymentId,
-          'razorpay_signature': signature,
-        }),
+        body: jsonEncode(requestBody),
       );
+      
+      print('🔐 Verify response status: ${response.statusCode}');
+      print('🔐 Verify response body: ${response.body}');
+      print('🔐 ========================================');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -160,11 +200,16 @@ class SubscriptionService {
   // Cancel subscription
   Future<bool> cancelSubscription(String userId) async {
     try {
+      print('❌ Cancelling subscription for user: $userId');
+      
       final response = await http.post(
         Uri.parse(ApiConfig.subscriptionCancel),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'userId': userId}),
       );
+      
+      print('❌ Cancel response status: ${response.statusCode}');
+      print('❌ Cancel response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

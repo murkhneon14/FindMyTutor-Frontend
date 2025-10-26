@@ -120,13 +120,20 @@ class _ExploreScreenState extends State<ExploreScreen>
       final token = prefs.getString('auth_token');
       if (token != null) {
         try {
-          final response = await http.get(
-            Uri.parse(ApiConfig.me),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          );
+          final response = await http
+              .get(
+                Uri.parse(ApiConfig.me),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $token',
+                },
+              )
+              .timeout(
+                const Duration(seconds: 10),
+                onTimeout: () {
+                  throw Exception('Request timeout - please check your internet connection');
+                },
+              );
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
@@ -145,21 +152,26 @@ class _ExploreScreenState extends State<ExploreScreen>
             if (userRole != null) await prefs.setString('user_role', userRole);
 
             print(
-              'Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole',
+              '✅ Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole',
             );
+          } else {
+            print('❌ Error fetching profile: HTTP ${response.statusCode}');
           }
         } catch (e) {
-          print('Error fetching user data: $e');
+          print('❌ Error fetching profile: $e');
+          // Continue with cached data if available
         }
       }
     }
 
     // Always set the state with the loaded or fetched data
-    setState(() {
-      _currentUserId = userId;
-      _currentUserName = userName;
-      _userRole = userRole;
-    });
+    if (mounted) {
+      setState(() {
+        _currentUserId = userId;
+        _currentUserName = userName;
+        _userRole = userRole;
+      });
+    }
 
     print('User role loaded: $_userRole');
   }
@@ -227,35 +239,50 @@ class _ExploreScreenState extends State<ExploreScreen>
         'longitude': _currentLocation!.longitude,
         'radius': _searchRadius,
         if (_selectedSubjects.isNotEmpty)
-          'subject': _selectedSubjects, // Send array of subjects
+          'subjects': _selectedSubjects, // Send array of subjects
         if (_selectedPreferredClasses.isNotEmpty)
-          'preferredClass':
+          'preferredClasses':
               _selectedPreferredClasses, // Send array of preferred classes
         'page': 1,
         'limit': 20,
       };
 
-      print('Sending request to: ${ApiConfig.nearbyTeachers}');
-      print('Request body: $requestBody');
+      print('🔍 ========== SEARCH NEARBY TEACHERS ==========');
+      print('🔍 Endpoint: ${ApiConfig.nearbyTeachers}');
+      print('🔍 Request Headers: Content-Type: application/json, Authorization: Bearer ***');
+      print('🔍 Request Body: $requestBody');
+      print('🔍 ============================================');
 
-      final response = await http.post(
-        Uri.parse(ApiConfig.nearbyTeachers),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(requestBody),
-      );
+      final response = await http
+          .post(
+            Uri.parse(ApiConfig.nearbyTeachers),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(requestBody),
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception('Request timeout - please check your internet connection');
+            },
+          );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('✅ Response status: ${response.statusCode}');
+      print('📦 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
+        // Check if response is HTML instead of JSON
+        if (response.body.trim().startsWith('<')) {
+          throw FormatException('Server returned HTML instead of JSON. Endpoint may not exist.');
+        }
+        
         final responseData = jsonDecode(response.body);
-        print('Parsed response data: $responseData');
+        print('✅ Parsed response data: $responseData');
 
         final tutors = responseData['tutors'] ?? [];
-        print('Found ${tutors.length} teachers');
+        print('✅ Found ${tutors.length} teachers');
 
         setState(() {
           _searchResults = List<Map<String, dynamic>>.from(tutors);
@@ -272,11 +299,15 @@ class _ExploreScreenState extends State<ExploreScreen>
           }
         }
       } else {
+        print('❌ API Error - Status Code: ${response.statusCode}');
+        print('❌ Response Headers: ${response.headers}');
+        print('❌ Response Body: ${response.body}');
+        
         final errorMessage = response.body.isNotEmpty
             ? jsonDecode(response.body)['message'] ?? 'Unknown error occurred'
             : 'No response from server';
 
-        print('Error response: $errorMessage');
+        print('❌ Error Message: $errorMessage');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -288,8 +319,11 @@ class _ExploreScreenState extends State<ExploreScreen>
         }
       }
     } catch (e, stackTrace) {
-      print('Exception in _searchNearbyTeachers: $e');
-      print('Stack trace: $stackTrace');
+      print('❌❌❌ EXCEPTION in _searchNearbyTeachers ❌❌❌');
+      print('❌ Error Type: ${e.runtimeType}');
+      print('❌ Error Message: $e');
+      print('❌ Stack Trace:');
+      print(stackTrace);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -345,32 +379,47 @@ class _ExploreScreenState extends State<ExploreScreen>
         'longitude': _currentLocation!.longitude,
         'radius': _searchRadius,
         if (_selectedPreferredClasses.isNotEmpty)
-          'classGrade': _selectedPreferredClasses, // Send array of class grades
+          'classGrades': _selectedPreferredClasses, // Send array of class grades
         'page': 1,
         'limit': 20,
       };
 
-      print('Sending request to: ${ApiConfig.nearbyStudents}');
-      print('Request body: $requestBody');
+      print('🔍 ========== SEARCH NEARBY STUDENTS ==========');
+      print('🔍 Endpoint: ${ApiConfig.nearbyStudents}');
+      print('🔍 Request Headers: Content-Type: application/json, Authorization: Bearer ***');
+      print('🔍 Request Body: $requestBody');
+      print('🔍 ============================================');
 
-      final response = await http.post(
-        Uri.parse(ApiConfig.nearbyStudents),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(requestBody),
-      );
+      final response = await http
+          .post(
+            Uri.parse(ApiConfig.nearbyStudents),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(requestBody),
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception('Request timeout - please check your internet connection');
+            },
+          );
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      print('✅ Response status: ${response.statusCode}');
+      print('📦 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
+        // Check if response is HTML instead of JSON
+        if (response.body.trim().startsWith('<')) {
+          throw FormatException('Server returned HTML instead of JSON. Endpoint may not exist.');
+        }
+        
         final responseData = jsonDecode(response.body);
-        print('Parsed response data: $responseData');
+        print('✅ Parsed response data: $responseData');
 
         final students = responseData['students'] ?? [];
-        print('Found ${students.length} students');
+        print('✅ Found ${students.length} students');
 
         setState(() {
           _searchResults = List<Map<String, dynamic>>.from(students);
@@ -385,9 +434,13 @@ class _ExploreScreenState extends State<ExploreScreen>
           );
         }
       } else {
+        print('❌ API Error - Status Code: ${response.statusCode}');
+        print('❌ Response Headers: ${response.headers}');
+        print('❌ Response Body: ${response.body}');
+        
         final errorData = jsonDecode(response.body);
         final errorMessage = errorData['message'] ?? 'Failed to fetch students';
-        print('Error: $errorMessage');
+        print('❌ Error Message: $errorMessage');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -399,8 +452,11 @@ class _ExploreScreenState extends State<ExploreScreen>
         }
       }
     } catch (e, stackTrace) {
-      print('Exception in _searchNearbyStudents: $e');
-      print('Stack trace: $stackTrace');
+      print('❌❌❌ EXCEPTION in _searchNearbyStudents ❌❌❌');
+      print('❌ Error Type: ${e.runtimeType}');
+      print('❌ Error Message: $e');
+      print('❌ Stack Trace:');
+      print(stackTrace);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

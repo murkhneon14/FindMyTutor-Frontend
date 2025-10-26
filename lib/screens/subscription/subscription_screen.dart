@@ -35,7 +35,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     setState(() => _isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
-      _userId = prefs.getString('userId');
+      _userId = prefs.getString('user_id');
+      
+      print('📱 Subscription Screen - Loading user data');
+      print('📱 User ID: ${_userId ?? "NULL"}');
 
       if (_userId != null) {
         final status = await _subscriptionService.getSubscriptionStatus(_userId!);
@@ -54,8 +57,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _subscribeToPremium() async {
+    print('📱 Subscribe button pressed');
+    print('📱 Current User ID: ${_userId ?? "NULL"}');
+    
     if (_userId == null) {
-      _showError('User not found');
+      print('❌ User ID is null - showing error');
+      _showError('User not found. Please login again.');
       return;
     }
 
@@ -64,24 +71,32 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     try {
       // Get user details
       final prefs = await SharedPreferences.getInstance();
-      final userEmail = prefs.getString('email') ?? '';
-      final userName = prefs.getString('name') ?? '';
+      final userEmail = prefs.getString('user_email') ?? '';
+      final userName = prefs.getString('user_name') ?? '';
 
       // Create subscription
       final result = await _subscriptionService.createSubscription(_userId!);
 
       if (result['success'] == true) {
+        final razorpaySubscriptionId = result['subscriptionId'];
+        print('💳 Razorpay Subscription ID: $razorpaySubscriptionId');
+        
         // Open Razorpay checkout
         _subscriptionService.openCheckout(
-          subscriptionId: result['subscriptionId'],
+          subscriptionId: razorpaySubscriptionId,
           amount: result['amount'],
           userEmail: userEmail,
           userName: userName,
           onSuccess: (PaymentSuccessResponse response) async {
-            // Verify payment
+            print('💳 Payment Success Response:');
+            print('💳 Payment ID: ${response.paymentId}');
+            print('💳 Order ID: ${response.orderId}');
+            print('💳 Signature: ${response.signature}');
+            
+            // Verify payment - use the stored subscription ID, not order ID
             final verified = await _subscriptionService.verifySubscription(
               userId: _userId!,
-              subscriptionId: response.orderId ?? '',
+              subscriptionId: razorpaySubscriptionId,
               paymentId: response.paymentId ?? '',
               signature: response.signature ?? '',
             );
@@ -90,10 +105,13 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               _showSuccess('Subscription activated successfully!');
               _loadUserData();
             } else {
-              _showError('Payment verification failed');
+              _showError('Payment verification failed. Please contact support.');
             }
           },
           onError: (PaymentFailureResponse response) {
+            print('❌ Payment Error Response:');
+            print('❌ Code: ${response.code}');
+            print('❌ Message: ${response.message}');
             _showError('Payment failed: ${response.message}');
           },
         );
