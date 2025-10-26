@@ -11,6 +11,15 @@ class ApiConfig {
   static String get studentProfile => '$baseUrl/api/auth/student-profile';
   static String get teacherProfile => '$baseUrl/api/auth/teacher-profile';
   static String get me => '$baseUrl/api/auth/me';
+  
+  // Search endpoints
+  static String get nearbyTeachers => '$baseUrl/api/auth/nearby-teachers';
+  static String get nearbyStudents => '$baseUrl/api/auth/nearby-students';
+  static String get allTeachers => '$baseUrl/api/auth/all-teachers';
+  static String get allStudents => '$baseUrl/api/auth/all-students';
+  static String teacherProfileById(String id) => '$baseUrl/api/auth/teacher-profile/$id';
+  static String studentProfileById(String id) => '$baseUrl/api/auth/student-profile/$id';
+  static String get updateLocation => '$baseUrl/api/auth/update-location';
 
   // Chat endpoints
   static String get chatBase => '$baseUrl/api/chat';

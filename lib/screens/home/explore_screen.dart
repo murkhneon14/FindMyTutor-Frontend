@@ -33,6 +33,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
+  String? _userRole; // Track user role (teacher/student)
   int _currentBannerPage = 0;
 
   final List<Subject> _subjects = [
@@ -116,7 +117,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (token != null) {
         try {
           final response = await http.get(
-            Uri.parse('${ApiConfig.baseUrl}/api/auth/me'),
+            Uri.parse(ApiConfig.me),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
@@ -139,18 +140,28 @@ class _ExploreScreenState extends State<ExploreScreen>
               await prefs.setString('user_email', userEmail);
             if (userRole != null) await prefs.setString('user_role', userRole);
 
-            print('Fetched and saved user data: ID=$userId, Name=$userName');
+            print('Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole');
           }
         } catch (e) {
           print('Error fetching user data: $e');
         }
       }
+      
+      // Also load role from SharedPreferences
+      final role = prefs.getString('user_role');
+      
+      setState(() {
+        _currentUserId = userId;
+        _currentUserName = userName;
+        _userRole = role;
+      });
+    } else {
+      setState(() {
+        _currentUserId = userId;
+        _currentUserName = userName;
+        _userRole = null;
+      });
     }
-
-    setState(() {
-      _currentUserId = userId;
-      _currentUserName = userName;
-    });
   }
 
   @override
@@ -224,12 +235,12 @@ class _ExploreScreenState extends State<ExploreScreen>
       };
 
       print(
-        'Sending request to: ${ApiConfig.baseUrl}/api/auth/nearby-teachers',
+        'Sending request to: ${ApiConfig.nearbyTeachers}',
       );
       print('Request body: $requestBody');
 
       final response = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/auth/nearby-teachers'),
+        Uri.parse(ApiConfig.nearbyTeachers),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -279,6 +290,119 @@ class _ExploreScreenState extends State<ExploreScreen>
       }
     } catch (e, stackTrace) {
       print('Exception in _searchNearbyTeachers: $e');
+      print('Stack trace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
+  }
+
+  Future<void> _searchNearbyStudents() async {
+    if (_currentLocation == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enable location to search nearby students'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      await _getCurrentLocation();
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _isSearching = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      print('Auth Token: ${token != null ? 'Token exists' : 'No token found'}');
+
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please login to search for students'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final requestBody = {
+        'latitude': _currentLocation!.latitude,
+        'longitude': _currentLocation!.longitude,
+        'radius': _searchRadius,
+        if (_selectedPreferredClasses.isNotEmpty)
+          'classGrade': _selectedPreferredClasses, // Send array of class grades
+        'page': 1,
+        'limit': 20,
+      };
+
+      print(
+        'Sending request to: ${ApiConfig.nearbyStudents}',
+      );
+      print('Request body: $requestBody');
+
+      final response = await http.post(
+        Uri.parse(ApiConfig.nearbyStudents),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(requestBody),
+      );
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('Parsed response data: $responseData');
+
+        final students = responseData['students'] ?? [];
+        print('Found ${students.length} students');
+
+        setState(() {
+          _searchResults = List<Map<String, dynamic>>.from(students);
+        });
+
+        if (students.isEmpty && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No students found in this area'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = errorData['message'] ?? 'Failed to fetch students';
+        print('Error: $errorMessage');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $errorMessage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e, stackTrace) {
+      print('Exception in _searchNearbyStudents: $e');
       print('Stack trace: $stackTrace');
 
       if (mounted) {
@@ -348,7 +472,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     shaderCallback: (bounds) =>
                         AppTheme.primaryGradient.createShader(bounds),
                     child: Text(
-                      ' Tutor',
+                      _userRole == 'teacher' ? ' Student' : ' Tutor',
                       style: Theme.of(
                         context,
                       ).textTheme.displayMedium?.copyWith(color: Colors.white),
@@ -691,9 +815,80 @@ class _ExploreScreenState extends State<ExploreScreen>
               ),
               const SizedBox(height: 16),
 
-              // Subject Filter
+              // Filter Section - Show subjects for students, class grades for teachers
+              if (_userRole != 'teacher') ..[
+                // Subject Filter (for students)
+                Text(
+                  'Filter by Subject',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _subjects.map((subject) {
+                        final isSelected = _selectedSubjects.contains(subject.name);
+                        return FilterChip(
+                          label: Text(subject.name),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedSubjects.add(subject.name);
+                              } else {
+                                _selectedSubjects.remove(subject.name);
+                              }
+                            });
+                          },
+                          backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                          selectedColor: subject.color.withOpacity(0.3),
+                          checkmarkColor: subject.color,
+                          labelStyle: TextStyle(
+                            color: isSelected
+                                ? subject.color
+                                : (isDarkMode ? Colors.white70 : Colors.black87),
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          side: BorderSide(
+                            color: isSelected
+                                ? subject.color
+                                : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
+                            width: isSelected ? 2 : 1,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (_selectedSubjects.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _selectedSubjects.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.clear_all, size: 16),
+                          label: const Text('Clear All'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              
+              // Class/Grade Filter (for both students and teachers)
+              const SizedBox(height: 16),
               Text(
-                'Filter by Subject',
+                _userRole == 'teacher' ? 'Filter by Class/Grade' : 'Filter by Preferred Classes',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -701,52 +896,67 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              // Subject Filter - Multi-select with chips
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: _subjects.map((subject) {
-                      final isSelected = _selectedSubjects.contains(subject.name);
+                    children: [
+                      'Pre-School',
+                      '1st Grade',
+                      '2nd Grade',
+                      '3rd Grade',
+                      '4th Grade',
+                      '5th Grade',
+                      '6th Grade',
+                      '7th Grade',
+                      '8th Grade',
+                      '9th Grade',
+                      '10th Grade',
+                      '11th Grade',
+                      '12th Grade',
+                      'College',
+                      'University',
+                    ].map((grade) {
+                      final isSelected = _selectedPreferredClasses.contains(grade);
                       return FilterChip(
-                        label: Text(subject.name),
+                        label: Text(grade),
                         selected: isSelected,
                         onSelected: (selected) {
                           setState(() {
                             if (selected) {
-                              _selectedSubjects.add(subject.name);
+                              _selectedPreferredClasses.add(grade);
                             } else {
-                              _selectedSubjects.remove(subject.name);
+                              _selectedPreferredClasses.remove(grade);
                             }
                           });
                         },
                         backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                        selectedColor: subject.color.withOpacity(0.3),
-                        checkmarkColor: subject.color,
+                        selectedColor: AppTheme.primaryColor.withOpacity(0.3),
+                        checkmarkColor: AppTheme.primaryColor,
                         labelStyle: TextStyle(
                           color: isSelected
-                              ? subject.color
+                              ? AppTheme.primaryColor
                               : (isDarkMode ? Colors.white70 : Colors.black87),
                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                         ),
                         side: BorderSide(
                           color: isSelected
-                              ? subject.color
+                              ? AppTheme.primaryColor
                               : (isDarkMode ? Colors.grey[700]! : Colors.grey[400]!),
                           width: isSelected ? 2 : 1,
                         ),
                       );
                     }).toList(),
                   ),
-                  if (_selectedSubjects.isNotEmpty)
+                  if (_selectedPreferredClasses.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: TextButton.icon(
                         onPressed: () {
                           setState(() {
-                            _selectedSubjects.clear();
+                            _selectedPreferredClasses.clear();
                           });
                         },
                         icon: const Icon(Icons.clear_all, size: 16),
@@ -764,7 +974,11 @@ class _ExploreScreenState extends State<ExploreScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSearching ? null : _searchNearbyTeachers,
+                  onPressed: _isSearching
+                      ? null
+                      : (_userRole == 'teacher'
+                          ? _searchNearbyStudents
+                          : _searchNearbyTeachers),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
@@ -783,9 +997,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text(
-                          'Search Teachers',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      : Text(
+                          _userRole == 'teacher' ? 'Search Students' : 'Search Teachers',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                 ),
               ),
@@ -797,7 +1011,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_searchResults.length} Teachers Found',
+                      _userRole == 'teacher'
+                          ? '${_searchResults.length} Students Found'
+                          : '${_searchResults.length} Teachers Found',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -806,7 +1022,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                     const SizedBox(height: 16),
                     ..._searchResults
-                        .map((teacher) => _buildTeacherCard(teacher))
+                        .map((result) => _userRole == 'teacher'
+                            ? _buildStudentCard(result)
+                            : _buildTeacherCard(result))
                         .toList(),
                   ],
                 )
@@ -1082,6 +1300,299 @@ class _ExploreScreenState extends State<ExploreScreen>
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () => _handleMessageTeacher(teacher),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.message, color: Colors.white, size: 18),
+                label: const Text(
+                  'Message',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleMessageStudent(Map<String, dynamic> student) async {
+    if (_currentUserId == null || _currentUserName == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please login to message students'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final user = student['userId'] ?? {};
+    final studentId = user['_id']?.toString();
+    final studentName = user['name']?.toString() ?? 'Student';
+    final studentEmail = user['email']?.toString() ?? '';
+
+    if (studentId == null || studentId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to message this student'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Don't allow messaging yourself
+    if (studentId == _currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot message yourself'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // Get or create chat
+      final chatRoom = await _chatService.getOrCreateChat(
+        _currentUserId!,
+        studentId,
+      );
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (chatRoom != null) {
+        // Navigate to chat screen
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ChatScreen(
+                chatId: chatRoom.id,
+                currentUserId: _currentUserId!,
+                currentUserName: _currentUserName!,
+                otherUser: ChatUser(
+                  id: studentId,
+                  name: studentName,
+                  email: studentEmail,
+                  role: 'student',
+                ),
+              ),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Unable to start chat. Please try logging out and logging in again.',
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildStudentCard(Map<String, dynamic> student) {
+    final user = student['userId'] ?? {};
+    final name = user['name']?.toString() ?? 'Unknown';
+    final email = user['email']?.toString() ?? '';
+    final classGrade = student['classGrade']?.toString() ?? 'N/A';
+    final schoolName = student['schoolName']?.toString() ?? 'N/A';
+    final learningGoals = student['learningGoals']?.toString() ?? 'Not specified';
+    final guardianName = student['guardianName']?.toString();
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDarkMode ? Colors.grey[800] : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                  child: Text(
+                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        email,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDarkMode
+                    ? AppTheme.primaryColor.withOpacity(0.1)
+                    : AppTheme.primaryColor.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.school,
+                        size: 16,
+                        color: AppTheme.primaryColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Class: $classGrade',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_city,
+                        size: 16,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          schoolName,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (guardianName != null && guardianName.isNotEmpty) ..[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.family_restroom,
+                          size: 16,
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Guardian: $guardianName',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.flag,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Goals: $learningGoals',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _handleMessageStudent(student),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryColor,
                   shape: RoundedRectangleBorder(
