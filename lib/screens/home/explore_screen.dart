@@ -10,6 +10,8 @@ import '../../config/api.dart';
 import '../../services/chat_service.dart';
 import '../../models/chat_room.dart';
 import '../chat_screen.dart';
+import '../../services/subscription_service.dart';
+import '../subscription/subscription_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -1110,6 +1112,13 @@ class _ExploreScreenState extends State<ExploreScreen>
       return;
     }
 
+    // Check if user has premium subscription
+    final isPremium = await SubscriptionService().isPremiumUser();
+    if (!isPremium) {
+      _showPremiumDialog();
+      return;
+    }
+
     final user = teacher['userId'] ?? {};
     final teacherId = user['_id']?.toString();
     final teacherName = user['name']?.toString() ?? 'Teacher';
@@ -1361,6 +1370,13 @@ class _ExploreScreenState extends State<ExploreScreen>
           backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
+
+    // Check if user has premium subscription
+    final isPremium = await SubscriptionService().isPremiumUser();
+    if (!isPremium) {
+      _showPremiumDialog();
       return;
     }
 
@@ -1689,6 +1705,111 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showPremiumDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: const [
+            Icon(Icons.lock, color: Color(0xFF6C63FF), size: 28),
+            SizedBox(width: 10),
+            Text('Premium Feature'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Messaging is a premium feature. Subscribe to unlock:',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 15),
+            _buildPremiumFeature('Unlimited messaging'),
+            _buildPremiumFeature('Direct chat access'),
+            _buildPremiumFeature('Real-time notifications'),
+            _buildPremiumFeature('Priority support'),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6C63FF).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Text(
+                    '₹299',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF6C63FF),
+                    ),
+                  ),
+                  Text(
+                    '/month',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Maybe Later'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubscriptionScreen(),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6C63FF),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Subscribe Now',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumFeature(String feature) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle,
+            color: Color(0xFF6C63FF),
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(feature),
+        ],
       ),
     );
   }

@@ -5,6 +5,8 @@ import '../services/chat_service.dart';
 import '../services/socket_service.dart';
 import '../config/api.dart';
 import 'chat_screen.dart';
+import '../services/subscription_service.dart';
+import 'subscription/subscription_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   final String currentUserId;
@@ -29,7 +31,72 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   void initState() {
     super.initState();
+    _checkPremiumAndInitialize();
+  }
+
+  Future<void> _checkPremiumAndInitialize() async {
+    final isPremium = await SubscriptionService().isPremiumUser();
+    if (!isPremium && mounted) {
+      setState(() => _isLoading = false);
+      _showPremiumRequired();
+      return;
+    }
     _initializeChat();
+  }
+
+  void _showPremiumRequired() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.lock, color: Color(0xFF6C63FF), size: 28),
+              SizedBox(width: 10),
+              Text('Premium Required'),
+            ],
+          ),
+          content: const Text(
+            'You need a premium subscription to access messaging features. Subscribe now to start chatting!',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context); // Go back to previous screen
+              },
+              child: const Text('Go Back'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SubscriptionScreen(),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6C63FF),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                'Subscribe Now',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Future<void> _initializeChat() async {

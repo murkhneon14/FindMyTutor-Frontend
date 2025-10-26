@@ -33,4 +33,10 @@ class ApiConfig {
 
   // Socket.IO endpoint
   static String get socketUrl => baseUrl;
+
+  // Subscription endpoints
+  static String get subscriptionCreate => '$baseUrl/api/subscription/create';
+  static String get subscriptionVerify => '$baseUrl/api/subscription/verify';
+  static String subscriptionStatus(String userId) => '$baseUrl/api/subscription/status/$userId';
+  static String get subscriptionCancel => '$baseUrl/api/subscription/cancel';
 }
