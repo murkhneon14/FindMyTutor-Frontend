@@ -497,7 +497,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     setState(() {
       _isSearching = true;
       // Switch to search tab and set the subject filter
-      _selectedTabIndex = 1; // Switch to Search tab
+      _tabController.animateTo(1); // Switch to Search tab
       _selectedSubjects = [subjectName]; // Set the selected subject
     });
 
