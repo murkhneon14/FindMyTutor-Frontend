@@ -15,6 +15,7 @@ class ApiConfig {
   // Search endpoints
   static String get nearbyTeachers => '$baseUrl/api/auth/nearby-teachers';
   static String get nearbyStudents => '$baseUrl/api/auth/nearby-students';
+  static String get searchBySubject => '$baseUrl/api/auth/search-by-subject';
   static String get allTeachers => '$baseUrl/api/auth/all-teachers';
   static String get allStudents => '$baseUrl/api/auth/all-students';
   static String teacherProfileById(String id) => '$baseUrl/api/auth/teacher-profile/$id';
