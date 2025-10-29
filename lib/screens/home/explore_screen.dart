@@ -477,22 +477,6 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   // Search teachers by subject when subject card is tapped
   Future<void> _searchBySubject(String subjectName) async {
-    // Get current location first
-    if (_currentLocation == null) {
-      await _getCurrentLocation();
-      if (_currentLocation == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enable location to search'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
     if (!mounted) return;
     setState(() {
       _isSearching = true;
@@ -518,22 +502,20 @@ class _ExploreScreenState extends State<ExploreScreen>
       }
 
       final requestBody = {
-        'latitude': _currentLocation!.latitude,
-        'longitude': _currentLocation!.longitude,
-        'radius': _searchRadius,
-        'subjects': [subjectName], // Search by this subject
+        'subject': subjectName, // Search by this subject (no location needed)
         'page': 1,
-        'limit': 20,
+        'limit': 50, // Get more results since we're not filtering by location
       };
 
       print('🔍 ========== SEARCH BY SUBJECT ==========');
       print('🔍 Subject: $subjectName');
       print('🔍 Request Body: $requestBody');
+      print('🔍 Endpoint: ${ApiConfig.searchBySubject}');
       print('🔍 ========================================');
 
       final response = await http
           .post(
-            Uri.parse(ApiConfig.nearbyTeachers),
+            Uri.parse(ApiConfig.searchBySubject),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
@@ -548,6 +530,7 @@ class _ExploreScreenState extends State<ExploreScreen>
           );
 
       print('✅ Response status: ${response.statusCode}');
+      print('📦 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         if (response.body.trim().startsWith('<')) {
@@ -555,20 +538,19 @@ class _ExploreScreenState extends State<ExploreScreen>
         }
 
         final data = jsonDecode(response.body);
-        print('📦 Found ${data['teachers']?.length ?? 0} teachers for $subjectName');
+        final teachersList = data['teachers'] ?? [];
+        print('📦 Found ${teachersList.length} teachers for $subjectName');
 
         if (mounted) {
           setState(() {
-            _searchResults = List<Map<String, dynamic>>.from(
-              data['teachers'] ?? [],
-            );
+            _searchResults = List<Map<String, dynamic>>.from(teachersList);
           });
 
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Found ${_searchResults.length} ${subjectName} teachers nearby',
+                'Found ${_searchResults.length} $subjectName teachers',
               ),
               backgroundColor: AppTheme.successColor,
               duration: const Duration(seconds: 2),
