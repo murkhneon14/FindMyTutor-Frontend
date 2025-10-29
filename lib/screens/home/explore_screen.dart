@@ -475,6 +475,128 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
   }
 
+  // Search teachers by subject when subject card is tapped
+  Future<void> _searchBySubject(String subjectName) async {
+    // Get current location first
+    if (_currentLocation == null) {
+      await _getCurrentLocation();
+      if (_currentLocation == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please enable location to search'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSearching = true;
+      // Switch to search tab and set the subject filter
+      _selectedTabIndex = 1; // Switch to Search tab
+      _selectedSubjects = [subjectName]; // Set the selected subject
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please login to search'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      final requestBody = {
+        'latitude': _currentLocation!.latitude,
+        'longitude': _currentLocation!.longitude,
+        'radius': _searchRadius,
+        'subjects': [subjectName], // Search by this subject
+        'page': 1,
+        'limit': 20,
+      };
+
+      print('🔍 ========== SEARCH BY SUBJECT ==========');
+      print('🔍 Subject: $subjectName');
+      print('🔍 Request Body: $requestBody');
+      print('🔍 ========================================');
+
+      final response = await http
+          .post(
+            Uri.parse(ApiConfig.nearbyTeachers),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(requestBody),
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw Exception('Request timeout');
+            },
+          );
+
+      print('✅ Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        if (response.body.trim().startsWith('<')) {
+          throw FormatException('Server returned HTML instead of JSON');
+        }
+
+        final data = jsonDecode(response.body);
+        print('📦 Found ${data['teachers']?.length ?? 0} teachers for $subjectName');
+
+        if (mounted) {
+          setState(() {
+            _searchResults = List<Map<String, dynamic>>.from(
+              data['teachers'] ?? [],
+            );
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Found ${_searchResults.length} ${subjectName} teachers nearby',
+              ),
+              backgroundColor: AppTheme.successColor,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to search: ${response.statusCode}');
+      }
+    } catch (e, stackTrace) {
+      print('❌ Error in _searchBySubject: $e');
+      print(stackTrace);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error searching for $subjectName teachers: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSearching = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -786,6 +908,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               return _AnimatedSubjectCard(
                 subject: _subjects[index],
                 index: index,
+                onTap: () => _searchBySubject(_subjects[index].name),
               );
             }, childCount: _subjects.length),
           ),
@@ -1923,8 +2046,13 @@ class _ExploreScreenState extends State<ExploreScreen>
 class _AnimatedSubjectCard extends StatefulWidget {
   final Subject subject;
   final int index;
+  final VoidCallback onTap;
 
-  const _AnimatedSubjectCard({required this.subject, required this.index});
+  const _AnimatedSubjectCard({
+    required this.subject,
+    required this.index,
+    required this.onTap,
+  });
 
   @override
   State<_AnimatedSubjectCard> createState() => _AnimatedSubjectCardState();
@@ -1981,7 +2109,9 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
             child: MouseRegion(
               onEnter: (_) => setState(() => _isHovered = true),
               onExit: (_) => setState(() => _isHovered = false),
-              child: AnimatedContainer(
+              child: GestureDetector(
+                onTap: widget.onTap,
+                child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 transform: Matrix4.identity()
                   ..setEntry(3, 2, 0.001)
@@ -2106,6 +2236,7 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
                     ),
                   ),
                 ),
+              ),
               ),
             ),
           ),
