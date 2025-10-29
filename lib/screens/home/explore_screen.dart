@@ -532,11 +532,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       print('✅ Response status: ${response.statusCode}');
       print('📦 Response body: ${response.body}');
 
-      if (response.statusCode == 200) {
-        if (response.body.trim().startsWith('<')) {
-          throw FormatException('Server returned HTML instead of JSON');
-        }
-
+      final isHtml = response.body.trim().startsWith('<');
+      if (response.statusCode == 200 && !isHtml) {
         final data = jsonDecode(response.body);
         final teachersList = data['teachers'] ?? [];
         print('📦 Found ${teachersList.length} teachers for $subjectName');
@@ -546,19 +543,91 @@ class _ExploreScreenState extends State<ExploreScreen>
             _searchResults = List<Map<String, dynamic>>.from(teachersList);
           });
 
-          // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                'Found ${_searchResults.length} $subjectName teachers',
-              ),
+              content: Text('Found ${_searchResults.length} $subjectName teachers'),
               backgroundColor: AppTheme.successColor,
               duration: const Duration(seconds: 2),
             ),
           );
         }
       } else {
-        throw Exception('Failed to search: ${response.statusCode}');
+        // Fallback when dedicated endpoint is unavailable or returns HTML
+        print('⚠️ search-by-subject unavailable (status ${response.statusCode}, html=$isHtml). Falling back...');
+
+        // 1) If we have location, use nearbyTeachers with subject filter
+        if (_currentLocation != null) {
+          final fallbackBody = {
+            'latitude': _currentLocation!.latitude,
+            'longitude': _currentLocation!.longitude,
+            'radius': _searchRadius,
+            'subjects': [subjectName],
+            'page': 1,
+            'limit': 20,
+          };
+
+          final nearby = await http.post(
+            Uri.parse(ApiConfig.nearbyTeachers),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(fallbackBody),
+          ).timeout(const Duration(seconds: 15));
+
+          if (nearby.statusCode == 200 && !nearby.body.trim().startsWith('<')) {
+            final data = jsonDecode(nearby.body);
+            final tutors = data['tutors'] ?? data['teachers'] ?? [];
+            if (mounted) {
+              setState(() {
+                _searchResults = List<Map<String, dynamic>>.from(tutors);
+              });
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Found ${_searchResults.length} $subjectName teachers nearby'),
+                backgroundColor: AppTheme.successColor,
+              ),
+            );
+            return;
+          }
+        }
+
+        // 2) Otherwise fetch all and filter client-side by subject name
+        try {
+          final all = await http.get(
+            Uri.parse(ApiConfig.allTeachers),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          ).timeout(const Duration(seconds: 15));
+
+          if (all.statusCode == 200 && !all.body.trim().startsWith('<')) {
+            final data = jsonDecode(all.body);
+            final list = (data['teachers'] ?? data) as dynamic;
+            final List filtered = (list as List).where((t) {
+              final subjects = (t['subjects'] as List?)?.map((e) => e.toString().toLowerCase()).toList() ?? const [];
+              return subjects.contains(subjectName.toLowerCase());
+            }).toList();
+
+            if (mounted) {
+              setState(() {
+                _searchResults = List<Map<String, dynamic>>.from(filtered.cast<Map<String, dynamic>>());
+              });
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Found ${_searchResults.length} $subjectName teachers'),
+                backgroundColor: AppTheme.successColor,
+              ),
+            );
+          } else {
+            throw Exception('Fallback failed: all-teachers status ${all.statusCode}');
+          }
+        } catch (_) {
+          throw Exception('Failed to search: ${response.statusCode}');
+        }
       }
     } catch (e, stackTrace) {
       print('❌ Error in _searchBySubject: $e');
@@ -1070,69 +1139,131 @@ class _ExploreScreenState extends State<ExploreScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children:
-                        [
-                          'Pre-School',
-                          '1st Grade',
-                          '2nd Grade',
-                          '3rd Grade',
-                          '4th Grade',
-                          '5th Grade',
-                          '6th Grade',
-                          '7th Grade',
-                          '8th Grade',
-                          '9th Grade',
-                          '10th Grade',
-                          '11th Grade',
-                          '12th Grade',
-                          'College',
-                          'University',
-                        ].map((grade) {
-                          final isSelected = _selectedPreferredClasses.contains(
-                            grade,
-                          );
-                          return FilterChip(
-                            label: Text(grade),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              setState(() {
-                                if (selected) {
-                                  _selectedPreferredClasses.add(grade);
-                                } else {
-                                  _selectedPreferredClasses.remove(grade);
-                                }
-                              });
+                  Builder(
+                    builder: (context) {
+                      final grades = [
+                        'Pre-School',
+                        '1st Grade',
+                        '2nd Grade',
+                        '3rd Grade',
+                        '4th Grade',
+                        '5th Grade',
+                        '6th Grade',
+                        '7th Grade',
+                        '8th Grade',
+                        '9th Grade',
+                        '10th Grade',
+                        '11th Grade',
+                        '12th Grade',
+                        'College',
+                        'University',
+                      ];
+
+                      return InkWell(
+                        onTap: () async {
+                          // Make a working copy
+                          final selected = Set<String>.from(_selectedPreferredClasses);
+
+                          await showDialog(
+                            context: context,
+                            builder: (context) {
+                              return StatefulBuilder(
+                                builder: (context, setLocalState) {
+                                  return AlertDialog(
+                                    title: const Text('Select Classes/Grades'),
+                                    content: SizedBox(
+                                      width: double.maxFinite,
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: grades.map((g) {
+                                            final isChecked = selected.contains(g);
+                                            return CheckboxListTile(
+                                              value: isChecked,
+                                              onChanged: (val) {
+                                                setLocalState(() {
+                                                  if (val == true) {
+                                                    selected.add(g);
+                                                  } else {
+                                                    selected.remove(g);
+                                                  }
+                                                });
+                                              },
+                                              title: Text(g),
+                                              dense: true,
+                                              controlAffinity: ListTileControlAffinity.leading,
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          selected.clear();
+                                          Navigator.of(context).pop();
+                                          setState(() {
+                                            _selectedPreferredClasses.clear();
+                                          });
+                                        },
+                                        child: const Text('Clear'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.of(context).pop();
+                                          setState(() {
+                                            _selectedPreferredClasses = selected.toList();
+                                          });
+                                        },
+                                        child: const Text('Apply'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
                             },
-                            backgroundColor: isDarkMode
-                                ? Colors.grey[800]
-                                : Colors.grey[200],
-                            selectedColor: AppTheme.primaryColor.withOpacity(
-                              0.3,
-                            ),
-                            checkmarkColor: AppTheme.primaryColor,
-                            labelStyle: TextStyle(
-                              color: isSelected
-                                  ? AppTheme.primaryColor
-                                  : (isDarkMode
-                                        ? Colors.white70
-                                        : Colors.black87),
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
-                            ),
-                            side: BorderSide(
-                              color: isSelected
-                                  ? AppTheme.primaryColor
-                                  : (isDarkMode
-                                        ? Colors.grey[700]!
-                                        : Colors.grey[400]!),
-                              width: isSelected ? 2 : 1,
-                            ),
                           );
-                        }).toList(),
+                        },
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _selectedPreferredClasses.isEmpty
+                                      ? 'Select classes/grades'
+                                      : _selectedPreferredClasses.join(', '),
+                                  style: TextStyle(
+                                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   if (_selectedPreferredClasses.isNotEmpty)
                     Padding(
@@ -1144,7 +1275,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                           });
                         },
                         icon: const Icon(Icons.clear_all, size: 16),
-                        label: const Text('Clear All'),
+                        label: const Text('Clear'),
                         style: TextButton.styleFrom(
                           foregroundColor: isDarkMode
                               ? Colors.white70
@@ -2188,24 +2319,6 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
                                         fontSize: 20,
                                         fontWeight: FontWeight.bold,
                                         letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.person_outline,
-                                      color: Colors.white70,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${widget.subject.tutorCount} tutors',
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ],

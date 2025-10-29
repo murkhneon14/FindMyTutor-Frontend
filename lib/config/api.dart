@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://findmy-tutor-backend.onrender.com',
+    defaultValue: 'https://findmy-tutor-backend-production-4360.up.railway.app',
   );
 
   // Auth endpoints
@@ -11,15 +11,17 @@ class ApiConfig {
   static String get studentProfile => '$baseUrl/api/auth/student-profile';
   static String get teacherProfile => '$baseUrl/api/auth/teacher-profile';
   static String get me => '$baseUrl/api/auth/me';
-  
+
   // Search endpoints
   static String get nearbyTeachers => '$baseUrl/api/auth/nearby-teachers';
   static String get nearbyStudents => '$baseUrl/api/auth/nearby-students';
-  static String get searchBySubject => '$baseUrl/api/auth/search-by-subject';
   static String get allTeachers => '$baseUrl/api/auth/all-teachers';
   static String get allStudents => '$baseUrl/api/auth/all-students';
-  static String teacherProfileById(String id) => '$baseUrl/api/auth/teacher-profile/$id';
-  static String studentProfileById(String id) => '$baseUrl/api/auth/student-profile/$id';
+  static String get searchBySubject => '$baseUrl/api/auth/search-by-subject';
+  static String teacherProfileById(String id) =>
+      '$baseUrl/api/auth/teacher-profile/$id';
+  static String studentProfileById(String id) =>
+      '$baseUrl/api/auth/student-profile/$id';
   static String get updateLocation => '$baseUrl/api/auth/update-location';
 
   // Chat endpoints
@@ -38,6 +40,7 @@ class ApiConfig {
   // Subscription endpoints
   static String get subscriptionCreate => '$baseUrl/api/subscription/create';
   static String get subscriptionVerify => '$baseUrl/api/subscription/verify';
-  static String subscriptionStatus(String userId) => '$baseUrl/api/subscription/status/$userId';
+  static String subscriptionStatus(String userId) =>
+      '$baseUrl/api/subscription/status/$userId';
   static String get subscriptionCancel => '$baseUrl/api/subscription/cancel';
 }
