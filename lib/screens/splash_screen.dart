@@ -23,6 +23,7 @@ class _SplashScreenState extends State<SplashScreen> {
     final hasCompletedOnboarding = prefs.getBool('hasCompletedOnboarding') ?? false;
     final authToken = prefs.getString('auth_token');
     final isLoggedIn = authToken != null && authToken.isNotEmpty;
+    print('🟦 Splash -> hasCompletedOnboarding=$hasCompletedOnboarding isLoggedIn=$isLoggedIn');
     
     // Add a small delay for better UX
     await Future.delayed(const Duration(milliseconds: 1500));
@@ -33,12 +34,15 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!hasCompletedOnboarding) {
         // First time - show onboarding
         nextScreen = const OnboardingScreen();
+        print('➡️ Navigating to Onboarding');
       } else if (isLoggedIn) {
         // Already logged in - go to main app
         nextScreen = const MainNavigation();
+        print('➡️ Navigating to MainNavigation');
       } else {
         // Onboarding done but not logged in - show auth screen
         nextScreen = const AuthChoiceScreen();
+        print('➡️ Navigating to AuthChoiceScreen');
       }
       
       Navigator.of(context).pushReplacement(

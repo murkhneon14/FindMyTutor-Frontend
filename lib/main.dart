@@ -20,14 +20,29 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   final isDarkMode = prefs.getBool('isDarkMode') ?? false;
   
-  // Initialize Firebase
-  await Firebase.initializeApp();
-  
-  // Set up background message handler
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  
-  // Initialize FCM service
-  await FCMService().initialize();
+  // Initialize Firebase and messaging defensively so UI is not blocked on errors
+  try {
+    await Firebase.initializeApp();
+    print('✅ Firebase initialized');
+  } catch (e, s) {
+    // Do not block app startup if Firebase fails to init
+    print('❌ Firebase initialize failed: $e');
+    print(s);
+  }
+
+  try {
+    // Set up background message handler (safe to call even if init failed)
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (_) {
+    // ignore if messaging is unavailable
+  }
+
+  try {
+    await FCMService().initialize();
+  } catch (e, s) {
+    print('❌ FCMService initialize failed: $e');
+    print(s);
+  }
   
   runApp(
     ChangeNotifierProvider(
