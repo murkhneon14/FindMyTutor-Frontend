@@ -2069,7 +2069,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
                   Text(
-                    '₹299',
+                    '₹49',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,

@@ -322,7 +322,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ),
                             ),
                             Text(
-                              '299',
+                              '49',
                               style: TextStyle(
                                 fontSize: 48,
                                 fontWeight: FontWeight.bold,

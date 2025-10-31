@@ -26,7 +26,7 @@ android {
         applicationId = "com.example.find_my_tutor"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 21  // Required for Firebase
+        minSdk = 23  // Required for Firebase
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
