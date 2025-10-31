@@ -294,45 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
-              // Divider
-              Row(
-                children: [
-                  Expanded(
-                    child: Divider(
-                      color: AppTheme.textSecondary.withOpacity(0.3),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'OR',
-                      style: TextStyle(
-                        color: AppTheme.textSecondary.withOpacity(0.7),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Divider(
-                      color: AppTheme.textSecondary.withOpacity(0.3),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
-              // Social Login Buttons
-              _buildSocialButton(
-                'Continue with Google',
-                Icons.g_mobiledata_rounded,
-                () {},
-              ),
-              const SizedBox(height: 16),
-              _buildSocialButton(
-                'Continue with Apple',
-                Icons.apple,
-                () {},
-              ),
+
             ],
           ),
         ),
@@ -410,46 +372,5 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton(String text, IconData icon, VoidCallback onTap) {
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppTheme.textSecondary.withOpacity(0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 24, color: AppTheme.textPrimary),
-              const SizedBox(width: 12),
-              Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+
 }
