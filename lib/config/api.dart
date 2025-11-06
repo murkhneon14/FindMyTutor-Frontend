@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://findmy-tutor-backend-production-4360.up.railway.app',
+    defaultValue: 'https://findmy-tutor-backend.onrender.com',
   );
 
   // Auth endpoints

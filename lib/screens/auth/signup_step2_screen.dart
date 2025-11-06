@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
@@ -7,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/api.dart';
+import '../home/main_navigation.dart';
 import '../../services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -287,7 +287,14 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
               ),
             ),
           );
-          Navigator.popUntil(context, (route) => route.isFirst);
+          // Go straight to Explore tab after successful signup
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MainNavigation(initialIndex: 1),
+            ),
+            (route) => false,
+          );
         } else {
           final msg = _extractError(response.body) ?? 'Failed to create profile';
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude specific shared preferences -->
+    <exclude domain="sharedpref" path=""/>
+    <!-- Exclude cache and other temporary files -->
+    <exclude domain="database" path="suggestions.db"/>
+    <exclude domain="file" path="suggestions.db"/>
+    <exclude domain="database" path="suggestions.db-journal"/>
+    <exclude domain="file" path="suggestions.db-journal"/>
+    <exclude domain="file" path="suggestions.db-wal"/>
+    <exclude domain="file" path="suggestions.db-shm"/>
+</full-backup-content>

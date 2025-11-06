@@ -11,6 +11,7 @@ import 'profile_details_screen.dart';
 import 'faq_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_screen.dart';
+import '../subscription/subscription_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -548,7 +549,7 @@ class _AccountScreenState extends State<AccountScreen> {
                             vertical: 14,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: const Color(0xFF6120D4),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
@@ -564,7 +565,7 @@ class _AccountScreenState extends State<AccountScreen> {
                               const Text(
                                 '₹49/month',
                                 style: TextStyle(
-                                  color: Color(0xFF9333EA),
+                                  color: Colors.white,
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -572,12 +573,12 @@ class _AccountScreenState extends State<AccountScreen> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF9333EA),
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
                                   Icons.arrow_forward,
-                                  color: Colors.white,
+                                  color: Color(0xFF6120D4),
                                   size: 20,
                                 ),
                               ),
@@ -869,25 +870,29 @@ class _AccountScreenState extends State<AccountScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Premium feature coming soon!'),
-                          backgroundColor: Color.fromARGB(255, 3, 88, 36),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SubscriptionScreen(),
                         ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppTheme.primaryColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Colors.white, width: 0),
                       ),
                       padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 2,
                     ),
                     child: const Text(
                       'Upgrade Now',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
                       ),
                     ),
                   ),
