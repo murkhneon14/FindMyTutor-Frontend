@@ -104,19 +104,67 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             print('💳 Order ID: ${response.orderId}');
             print('💳 Signature: ${response.signature}');
             
-            // Verify payment - use the stored subscription ID, not order ID
-            final verified = await _subscriptionService.verifySubscription(
-              userId: _userId!,
-              subscriptionId: razorpaySubscriptionId,
-              paymentId: response.paymentId ?? '',
-              signature: response.signature ?? '',
-            );
+            // Show loading during verification
+            setState(() => _isLoading = true);
+            
+            try {
+              // Validate payment response
+              if (response.paymentId == null || response.paymentId!.isEmpty ||
+                  response.signature == null || response.signature!.isEmpty) {
+                setState(() => _isLoading = false);
+                _showError('Invalid payment response. Please contact support with Payment ID: ${response.paymentId ?? "N/A"}');
+                return;
+              }
+              
+              // Verify payment - use the stored subscription ID, not order ID
+              print('🔐 Starting payment verification...');
+              final verified = await _subscriptionService.verifySubscription(
+                userId: _userId!,
+                subscriptionId: razorpaySubscriptionId,
+                paymentId: response.paymentId!,
+                signature: response.signature!,
+              );
 
-            if (verified) {
-              _showSuccess('Subscription activated successfully!');
-              _loadUserData();
-            } else {
-              _showError('Payment verification failed. Please contact support.');
+              setState(() => _isLoading = false);
+
+              if (verified) {
+                // Wait a moment for database to sync
+                await Future.delayed(const Duration(milliseconds: 500));
+                
+                // Reload user data to reflect premium status
+                await _loadUserData();
+                
+                // Verify premium status was actually updated
+                if (_isPremium) {
+                  _showSuccess('Subscription activated successfully!');
+                } else {
+                  // Premium status not updated yet, but verification succeeded
+                  _showSuccess('Payment verified! Premium status will be activated shortly.');
+                  // Try reloading again after a delay
+                  Future.delayed(const Duration(seconds: 2), () async {
+                    await _loadUserData();
+                  });
+                }
+              } else {
+                // Payment succeeded but verification failed
+                _showError(
+                  'Payment received but verification failed. '
+                  'Your payment has been processed. Please wait a few moments and refresh, '
+                  'or contact support with Payment ID: ${response.paymentId}'
+                );
+                // Still reload data in case it was updated
+                await _loadUserData();
+              }
+            } catch (e) {
+              setState(() => _isLoading = false);
+              print('❌ Error during verification: $e');
+              _showError(
+                'Error verifying payment: $e. '
+                'Your payment has been processed. Please wait a few moments and refresh, '
+                'or contact support with Payment ID: ${response.paymentId ?? "N/A"}'
+              );
+              // Still reload data in case it was updated
+              await _loadUserData();
             }
           },
           onError: (PaymentFailureResponse response) {
