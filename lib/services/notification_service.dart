@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:overlay_support/overlay_support.dart';
+import '../config/navigator_key.dart';
 
 class NotificationService {
   static void showMessageNotification({
@@ -8,13 +9,29 @@ class NotificationService {
     required String message,
     required VoidCallback onTap,
   }) {
-    showOverlayNotification(
-      (context) {
-        return GestureDetector(
-          onTap: () {
-            OverlaySupportEntry.of(context)?.dismiss();
-            onTap();
-          },
+    print('🔔 ========== NotificationService.showMessageNotification called ==========');
+    print('🔔 Sender: $senderName');
+    print('🔔 Message: $message');
+    print('🔔 Context: $context');
+    print('🔔 Context mounted: ${context.mounted}');
+    
+    try {
+      // Use the global navigator context for overlay notifications
+      final overlayContext = navigatorKey.currentContext ?? context;
+      if (!overlayContext.mounted) {
+        print('❌ Context is not mounted for overlay notification');
+        return;
+      }
+      
+      // showOverlayNotification doesn't need a context parameter - it uses the global overlay
+      showOverlayNotification(
+        (overlayContext) {
+          print('🔔 Building overlay notification widget');
+          return GestureDetector(
+            onTap: () {
+              OverlaySupportEntry.of(overlayContext)?.dismiss();
+              onTap();
+            },
           child: SafeArea(
             child: Container(
               margin: const EdgeInsets.all(16),
@@ -64,10 +81,16 @@ class NotificationService {
             ),
           ),
         );
-      },
-      duration: const Duration(seconds: 4),
-      position: NotificationPosition.top,
-    );
+        },
+        duration: const Duration(seconds: 4),
+        position: NotificationPosition.top,
+      );
+      print('🔔 ✅ Overlay notification shown successfully');
+    } catch (e, stackTrace) {
+      print('❌ Error showing overlay notification: $e');
+      print('❌ Stack trace: $stackTrace');
+    }
+    print('🔔 ============================================================');
   }
 
   static void showSimpleToast({

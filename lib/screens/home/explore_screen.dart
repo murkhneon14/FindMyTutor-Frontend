@@ -33,6 +33,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   List<String> _selectedSubjects = []; // Changed to support multiple subjects
   List<String> _selectedPreferredClasses =
       []; // Filter by preferred classes/grades
+  String? _selectedGender; // Filter by gender (for students searching teachers)
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
@@ -82,6 +83,48 @@ class _ExploreScreenState extends State<ExploreScreen>
       tutorCount: 143,
       color: const Color(0xFF06B6D4),
     ),
+    Subject(
+      name: 'Geography',
+      imageUrl:
+          'https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800',
+      tutorCount: 128,
+      color: const Color(0xFF14B8A6),
+    ),
+    Subject(
+      name: 'Hindi',
+      imageUrl:
+          'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=800',
+      tutorCount: 167,
+      color: const Color(0xFFEF4444),
+    ),
+    Subject(
+      name: 'Political Science',
+      imageUrl:
+          'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800',
+      tutorCount: 134,
+      color: const Color(0xFF7C3AED),
+    ),
+    Subject(
+      name: 'Business Studies',
+      imageUrl:
+          'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800',
+      tutorCount: 178,
+      color: const Color(0xFF059669),
+    ),
+    Subject(
+      name: 'Accountancy',
+      imageUrl:
+          'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800',
+      tutorCount: 152,
+      color: const Color(0xFFDC2626),
+    ),
+    Subject(
+      name: 'Economics',
+      imageUrl:
+          'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800',
+      tutorCount: 165,
+      color: const Color(0xFFF97316),
+    ),
   ];
 
   @override
@@ -97,7 +140,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   void _startAutoScroll() {
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted && _bannerController.hasClients) {
-        final nextPage = (_currentBannerPage + 1) % 3;
+        final nextPage = (_currentBannerPage + 1) % 4;
         _bannerController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 500),
@@ -131,7 +174,9 @@ class _ExploreScreenState extends State<ExploreScreen>
               .timeout(
                 const Duration(seconds: 10),
                 onTimeout: () {
-                  throw Exception('Request timeout - please check your internet connection');
+                  throw Exception(
+                    'Request timeout - please check your internet connection',
+                  );
                 },
               );
 
@@ -245,13 +290,16 @@ class _ExploreScreenState extends State<ExploreScreen>
         if (_selectedPreferredClasses.isNotEmpty)
           'preferredClasses':
               _selectedPreferredClasses, // Send array of preferred classes
+        if (_selectedGender != null) 'gender': _selectedGender, // Gender filter
         'page': 1,
         'limit': 20,
       };
 
       print('🔍 ========== SEARCH NEARBY TEACHERS ==========');
       print('🔍 Endpoint: ${ApiConfig.nearbyTeachers}');
-      print('🔍 Request Headers: Content-Type: application/json, Authorization: Bearer ***');
+      print(
+        '🔍 Request Headers: Content-Type: application/json, Authorization: Bearer ***',
+      );
       print('🔍 Request Body: $requestBody');
       print('🔍 ============================================');
 
@@ -267,7 +315,9 @@ class _ExploreScreenState extends State<ExploreScreen>
           .timeout(
             const Duration(seconds: 15),
             onTimeout: () {
-              throw Exception('Request timeout - please check your internet connection');
+              throw Exception(
+                'Request timeout - please check your internet connection',
+              );
             },
           );
 
@@ -277,17 +327,31 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (response.statusCode == 200) {
         // Check if response is HTML instead of JSON
         if (response.body.trim().startsWith('<')) {
-          throw FormatException('Server returned HTML instead of JSON. Endpoint may not exist.');
+          throw FormatException(
+            'Server returned HTML instead of JSON. Endpoint may not exist.',
+          );
         }
-        
+
         final responseData = jsonDecode(response.body);
         print('✅ Parsed response data: $responseData');
 
         final tutors = responseData['tutors'] ?? [];
         print('✅ Found ${tutors.length} teachers');
 
+        // Apply client-side gender filter if selected (as fallback)
+        List<Map<String, dynamic>> filteredTutors =
+            List<Map<String, dynamic>>.from(tutors);
+        if (_selectedGender != null && _userRole != 'teacher') {
+          filteredTutors = filteredTutors.where((t) {
+            final teacherGender = (t['userId']?['gender'] ?? t['gender'])
+                ?.toString();
+            return teacherGender?.toLowerCase() ==
+                _selectedGender!.toLowerCase();
+          }).toList();
+        }
+
         setState(() {
-          _searchResults = List<Map<String, dynamic>>.from(tutors);
+          _searchResults = filteredTutors;
         });
 
         if (mounted) {
@@ -304,7 +368,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         print('❌ API Error - Status Code: ${response.statusCode}');
         print('❌ Response Headers: ${response.headers}');
         print('❌ Response Body: ${response.body}');
-        
+
         final errorMessage = response.body.isNotEmpty
             ? jsonDecode(response.body)['message'] ?? 'Unknown error occurred'
             : 'No response from server';
@@ -381,14 +445,17 @@ class _ExploreScreenState extends State<ExploreScreen>
         'longitude': _currentLocation!.longitude,
         'radius': _searchRadius,
         if (_selectedPreferredClasses.isNotEmpty)
-          'classGrades': _selectedPreferredClasses, // Send array of class grades
+          'classGrades':
+              _selectedPreferredClasses, // Send array of class grades
         'page': 1,
         'limit': 20,
       };
 
       print('🔍 ========== SEARCH NEARBY STUDENTS ==========');
       print('🔍 Endpoint: ${ApiConfig.nearbyStudents}');
-      print('🔍 Request Headers: Content-Type: application/json, Authorization: Bearer ***');
+      print(
+        '🔍 Request Headers: Content-Type: application/json, Authorization: Bearer ***',
+      );
       print('🔍 Request Body: $requestBody');
       print('🔍 ============================================');
 
@@ -404,7 +471,9 @@ class _ExploreScreenState extends State<ExploreScreen>
           .timeout(
             const Duration(seconds: 15),
             onTimeout: () {
-              throw Exception('Request timeout - please check your internet connection');
+              throw Exception(
+                'Request timeout - please check your internet connection',
+              );
             },
           );
 
@@ -414,9 +483,11 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (response.statusCode == 200) {
         // Check if response is HTML instead of JSON
         if (response.body.trim().startsWith('<')) {
-          throw FormatException('Server returned HTML instead of JSON. Endpoint may not exist.');
+          throw FormatException(
+            'Server returned HTML instead of JSON. Endpoint may not exist.',
+          );
         }
-        
+
         final responseData = jsonDecode(response.body);
         print('✅ Parsed response data: $responseData');
 
@@ -439,7 +510,7 @@ class _ExploreScreenState extends State<ExploreScreen>
         print('❌ API Error - Status Code: ${response.statusCode}');
         print('❌ Response Headers: ${response.headers}');
         print('❌ Response Body: ${response.body}');
-        
+
         final errorData = jsonDecode(response.body);
         final errorMessage = errorData['message'] ?? 'Failed to fetch students';
         print('❌ Error Message: $errorMessage');
@@ -475,7 +546,8 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
   }
 
-  // Search teachers by subject when subject card is tapped
+  // Search by subject when subject card is tapped
+  // If teacher is logged in, search for students; otherwise search for teachers
   Future<void> _searchBySubject(String subjectName) async {
     if (!mounted) return;
     setState(() {
@@ -501,132 +573,266 @@ class _ExploreScreenState extends State<ExploreScreen>
         return;
       }
 
-      final requestBody = {
-        'subject': subjectName, // Search by this subject (no location needed)
-        'page': 1,
-        'limit': 50, // Get more results since we're not filtering by location
-      };
+      // If teacher is logged in, show all students; otherwise search for teachers by subject
+      if (_userRole == 'teacher') {
+        // Show all students (no subject filtering)
+        print('🔍 ========== FETCH ALL STUDENTS ==========');
+        print('🔍 User Role: Teacher - Showing all students');
+        print('🔍 ========================================');
 
-      print('🔍 ========== SEARCH BY SUBJECT ==========');
-      print('🔍 Subject: $subjectName');
-      print('🔍 Request Body: $requestBody');
-      print('🔍 Endpoint: ${ApiConfig.searchBySubject}');
-      print('🔍 ========================================');
-
-      final response = await http
-          .post(
-            Uri.parse(ApiConfig.searchBySubject),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: jsonEncode(requestBody),
-          )
-          .timeout(
-            const Duration(seconds: 15),
-            onTimeout: () {
-              throw Exception('Request timeout');
-            },
-          );
-
-      print('✅ Response status: ${response.statusCode}');
-      print('📦 Response body: ${response.body}');
-
-      final isHtml = response.body.trim().startsWith('<');
-      if (response.statusCode == 200 && !isHtml) {
-        final data = jsonDecode(response.body);
-        final teachersList = data['teachers'] ?? [];
-        print('📦 Found ${teachersList.length} teachers for $subjectName');
-
-        if (mounted) {
-          setState(() {
-            _searchResults = List<Map<String, dynamic>>.from(teachersList);
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Found ${_searchResults.length} $subjectName teachers'),
-              backgroundColor: AppTheme.successColor,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      } else {
-        // Fallback when dedicated endpoint is unavailable or returns HTML
-        print('⚠️ search-by-subject unavailable (status ${response.statusCode}, html=$isHtml). Falling back...');
-
-        // 1) If we have location, use nearbyTeachers with subject filter
+        // Try to use nearby students endpoint if location is available
         if (_currentLocation != null) {
-          final fallbackBody = {
+          final requestBody = {
             'latitude': _currentLocation!.latitude,
             'longitude': _currentLocation!.longitude,
             'radius': _searchRadius,
-            'subjects': [subjectName],
             'page': 1,
-            'limit': 20,
+            'limit': 50,
           };
 
-          final nearby = await http.post(
-            Uri.parse(ApiConfig.nearbyTeachers),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-            body: jsonEncode(fallbackBody),
-          ).timeout(const Duration(seconds: 15));
+          try {
+            final response = await http
+                .post(
+                  Uri.parse(ApiConfig.nearbyStudents),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: jsonEncode(requestBody),
+                )
+                .timeout(const Duration(seconds: 15));
 
-          if (nearby.statusCode == 200 && !nearby.body.trim().startsWith('<')) {
-            final data = jsonDecode(nearby.body);
-            final tutors = data['tutors'] ?? data['teachers'] ?? [];
-            if (mounted) {
-              setState(() {
-                _searchResults = List<Map<String, dynamic>>.from(tutors);
-              });
+            if (response.statusCode == 200 &&
+                !response.body.trim().startsWith('<')) {
+              final data = jsonDecode(response.body);
+              final studentsList = data['students'] ?? [];
+
+              if (mounted) {
+                setState(() {
+                  _searchResults = List<Map<String, dynamic>>.from(
+                    studentsList.cast<Map<String, dynamic>>(),
+                  );
+                });
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Found ${_searchResults.length} students'),
+                    backgroundColor: AppTheme.successColor,
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                return;
+              }
             }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Found ${_searchResults.length} $subjectName teachers nearby'),
-                backgroundColor: AppTheme.successColor,
-              ),
-            );
-            return;
+          } catch (e) {
+            print('⚠️ Nearby students search failed: $e');
           }
         }
 
-        // 2) Otherwise fetch all and filter client-side by subject name
+        // Fallback: fetch all students
         try {
-          final all = await http.get(
-            Uri.parse(ApiConfig.allTeachers),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          ).timeout(const Duration(seconds: 15));
+          final all = await http
+              .get(
+                Uri.parse(ApiConfig.allStudents),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $token',
+                },
+              )
+              .timeout(const Duration(seconds: 15));
 
           if (all.statusCode == 200 && !all.body.trim().startsWith('<')) {
             final data = jsonDecode(all.body);
-            final list = (data['teachers'] ?? data) as dynamic;
-            final List filtered = (list as List).where((t) {
-              final subjects = (t['subjects'] as List?)?.map((e) => e.toString().toLowerCase()).toList() ?? const [];
-              return subjects.contains(subjectName.toLowerCase());
-            }).toList();
+            final list = (data['students'] ?? data) as dynamic;
 
             if (mounted) {
               setState(() {
-                _searchResults = List<Map<String, dynamic>>.from(filtered.cast<Map<String, dynamic>>());
+                _searchResults = List<Map<String, dynamic>>.from(
+                  (list as List).cast<Map<String, dynamic>>(),
+                );
               });
             }
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Found ${_searchResults.length} $subjectName teachers'),
+                content: Text('Found ${_searchResults.length} students'),
                 backgroundColor: AppTheme.successColor,
               ),
             );
           } else {
-            throw Exception('Fallback failed: all-teachers status ${all.statusCode}');
+            throw Exception(
+              'Failed to fetch students: status ${all.statusCode}',
+            );
           }
-        } catch (_) {
-          throw Exception('Failed to search: ${response.statusCode}');
+        } catch (e) {
+          throw Exception('Failed to fetch students: $e');
+        }
+      } else {
+        // Search for teachers by subject (original logic for students)
+        final requestBody = {
+          'subject': subjectName, // Search by this subject (no location needed)
+          if (_selectedGender != null) 'gender': _selectedGender,
+          'page': 1,
+          'limit': 50, // Get more results since we're not filtering by location
+        };
+
+        print('🔍 ========== SEARCH BY SUBJECT ==========');
+        print('🔍 Subject: $subjectName');
+        print('🔍 Request Body: $requestBody');
+        print('🔍 Endpoint: ${ApiConfig.searchBySubject}');
+        print('🔍 ========================================');
+
+        final response = await http
+            .post(
+              Uri.parse(ApiConfig.searchBySubject),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode(requestBody),
+            )
+            .timeout(
+              const Duration(seconds: 15),
+              onTimeout: () {
+                throw Exception('Request timeout');
+              },
+            );
+
+        print('✅ Response status: ${response.statusCode}');
+        print('📦 Response body: ${response.body}');
+
+        final isHtml = response.body.trim().startsWith('<');
+        if (response.statusCode == 200 && !isHtml) {
+          final data = jsonDecode(response.body);
+          final teachersList = data['teachers'] ?? [];
+          print('📦 Found ${teachersList.length} teachers for $subjectName');
+
+          if (mounted) {
+            setState(() {
+              _searchResults = List<Map<String, dynamic>>.from(teachersList);
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Found ${_searchResults.length} $subjectName teachers',
+                ),
+                backgroundColor: AppTheme.successColor,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          // Fallback when dedicated endpoint is unavailable or returns HTML
+          print(
+            '⚠️ search-by-subject unavailable (status ${response.statusCode}, html=$isHtml). Falling back...',
+          );
+
+          // 1) If we have location, use nearbyTeachers with subject filter
+          if (_currentLocation != null) {
+            final fallbackBody = {
+              'latitude': _currentLocation!.latitude,
+              'longitude': _currentLocation!.longitude,
+              'radius': _searchRadius,
+              'subjects': [subjectName],
+              if (_selectedGender != null) 'gender': _selectedGender,
+              'page': 1,
+              'limit': 20,
+            };
+
+            final nearby = await http
+                .post(
+                  Uri.parse(ApiConfig.nearbyTeachers),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: jsonEncode(fallbackBody),
+                )
+                .timeout(const Duration(seconds: 15));
+
+            if (nearby.statusCode == 200 &&
+                !nearby.body.trim().startsWith('<')) {
+              final data = jsonDecode(nearby.body);
+              final tutors = data['tutors'] ?? data['teachers'] ?? [];
+              if (mounted) {
+                setState(() {
+                  _searchResults = List<Map<String, dynamic>>.from(tutors);
+                });
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Found ${_searchResults.length} $subjectName teachers nearby',
+                  ),
+                  backgroundColor: AppTheme.successColor,
+                ),
+              );
+              return;
+            }
+          }
+
+          // 2) Otherwise fetch all and filter client-side by subject name
+          try {
+            final all = await http
+                .get(
+                  Uri.parse(ApiConfig.allTeachers),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                )
+                .timeout(const Duration(seconds: 15));
+
+            if (all.statusCode == 200 && !all.body.trim().startsWith('<')) {
+              final data = jsonDecode(all.body);
+              final list = (data['teachers'] ?? data) as dynamic;
+              final List filtered = (list as List).where((t) {
+                // Filter by subject
+                final subjects =
+                    (t['subjects'] as List?)
+                        ?.map((e) => e.toString().toLowerCase())
+                        .toList() ??
+                    const [];
+                final matchesSubject = subjects.contains(
+                  subjectName.toLowerCase(),
+                );
+
+                // Filter by gender if selected
+                if (_selectedGender != null) {
+                  final teacherGender = (t['userId']?['gender'] ?? t['gender'])
+                      ?.toString();
+                  final matchesGender =
+                      teacherGender?.toLowerCase() ==
+                      _selectedGender!.toLowerCase();
+                  return matchesSubject && matchesGender;
+                }
+
+                return matchesSubject;
+              }).toList();
+
+              if (mounted) {
+                setState(() {
+                  _searchResults = List<Map<String, dynamic>>.from(
+                    filtered.cast<Map<String, dynamic>>(),
+                  );
+                });
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Found ${_searchResults.length} $subjectName teachers',
+                  ),
+                  backgroundColor: AppTheme.successColor,
+                ),
+              );
+            } else {
+              throw Exception(
+                'Fallback failed: all-teachers status ${all.statusCode}',
+              );
+            }
+          } catch (_) {
+            throw Exception('Failed to search: ${response.statusCode}');
+          }
         }
       }
     } catch (e, stackTrace) {
@@ -634,9 +840,10 @@ class _ExploreScreenState extends State<ExploreScreen>
       print(stackTrace);
 
       if (mounted) {
+        final searchType = _userRole == 'teacher' ? 'students' : 'teachers';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error searching for $subjectName teachers: $e'),
+            content: Text('Error searching for $subjectName $searchType: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -700,7 +907,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     shaderCallback: (bounds) =>
                         AppTheme.primaryGradient.createShader(bounds),
                     child: Text(
-                      _userRole == 'teacher' ? ' Student' : ' Tutor',
+                      ' Tutor',
                       style: Theme.of(
                         context,
                       ).textTheme.displayMedium?.copyWith(color: Colors.white),
@@ -746,6 +953,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     final List<String> bannerImages = [
       'assets/images/lekhi_tutorials_banner.jpg',
       'assets/images/lekhi_tutorials_banner1.jpg',
+      'assets/images/lk1.jpg',
       'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=400&fit=crop',
     ];
 
@@ -849,21 +1057,28 @@ class _ExploreScreenState extends State<ExploreScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.campaign_rounded, color: Colors.white, size: 48),
-            const SizedBox(height: 8),
-            Text(
-              'Advertise Your Coaching',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Advertise Your School, Coaching Institute, Study Hub, PG or Educational Event',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               'Reach thousands of students',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withOpacity(0.9),
-                fontSize: 14,
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
@@ -1162,7 +1377,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                       return InkWell(
                         onTap: () async {
                           // Make a working copy
-                          final selected = Set<String>.from(_selectedPreferredClasses);
+                          final selected = Set<String>.from(
+                            _selectedPreferredClasses,
+                          );
 
                           await showDialog(
                             context: context,
@@ -1177,7 +1394,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                                         child: Column(
                                           mainAxisSize: MainAxisSize.min,
                                           children: grades.map((g) {
-                                            final isChecked = selected.contains(g);
+                                            final isChecked = selected.contains(
+                                              g,
+                                            );
                                             return CheckboxListTile(
                                               value: isChecked,
                                               onChanged: (val) {
@@ -1191,7 +1410,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                                               },
                                               title: Text(g),
                                               dense: true,
-                                              controlAffinity: ListTileControlAffinity.leading,
+                                              controlAffinity:
+                                                  ListTileControlAffinity
+                                                      .leading,
                                             );
                                           }).toList(),
                                         ),
@@ -1209,14 +1430,16 @@ class _ExploreScreenState extends State<ExploreScreen>
                                         child: const Text('Clear'),
                                       ),
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
                                         child: const Text('Cancel'),
                                       ),
                                       ElevatedButton(
                                         onPressed: () {
                                           Navigator.of(context).pop();
                                           setState(() {
-                                            _selectedPreferredClasses = selected.toList();
+                                            _selectedPreferredClasses = selected
+                                                .toList();
                                           });
                                         },
                                         child: const Text('Apply'),
@@ -1231,14 +1454,21 @@ class _ExploreScreenState extends State<ExploreScreen>
                         child: InputDecorator(
                           decoration: InputDecoration(
                             filled: true,
-                            fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                            fillColor: isDarkMode
+                                ? Colors.grey[800]
+                                : Colors.grey[200],
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide(
-                                color: isDarkMode ? Colors.grey[700]! : Colors.grey[400]!,
+                                color: isDarkMode
+                                    ? Colors.grey[700]!
+                                    : Colors.grey[400]!,
                               ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -1248,7 +1478,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                                       ? 'Select classes/grades'
                                       : _selectedPreferredClasses.join(', '),
                                   style: TextStyle(
-                                    color: isDarkMode ? Colors.white70 : Colors.black87,
+                                    color: isDarkMode
+                                        ? Colors.white70
+                                        : Colors.black87,
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 2,
@@ -1257,7 +1489,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                               const SizedBox(width: 8),
                               Icon(
                                 Icons.arrow_drop_down,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                                color: isDarkMode
+                                    ? Colors.white70
+                                    : Colors.black54,
                               ),
                             ],
                           ),
@@ -1285,6 +1519,105 @@ class _ExploreScreenState extends State<ExploreScreen>
                     ),
                 ],
               ),
+
+              // Gender Filter (only for students)
+              if (_userRole != 'teacher') ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Filter by Gender',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('Male'),
+                        selected: _selectedGender == 'Male',
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedGender = selected ? 'Male' : null;
+                          });
+                        },
+                        backgroundColor: isDarkMode
+                            ? Colors.grey[800]
+                            : Colors.grey[200],
+                        selectedColor: AppTheme.primaryColor.withOpacity(0.3),
+                        labelStyle: TextStyle(
+                          color: _selectedGender == 'Male'
+                              ? AppTheme.primaryColor
+                              : (isDarkMode ? Colors.white70 : Colors.black87),
+                          fontWeight: _selectedGender == 'Male'
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: _selectedGender == 'Male'
+                              ? AppTheme.primaryColor
+                              : (isDarkMode
+                                    ? Colors.grey[700]!
+                                    : Colors.grey[400]!),
+                          width: _selectedGender == 'Male' ? 2 : 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ChoiceChip(
+                        label: const Text('Female'),
+                        selected: _selectedGender == 'Female',
+                        onSelected: (selected) {
+                          setState(() {
+                            _selectedGender = selected ? 'Female' : null;
+                          });
+                        },
+                        backgroundColor: isDarkMode
+                            ? Colors.grey[800]
+                            : Colors.grey[200],
+                        selectedColor: AppTheme.primaryColor.withOpacity(0.3),
+                        labelStyle: TextStyle(
+                          color: _selectedGender == 'Female'
+                              ? AppTheme.primaryColor
+                              : (isDarkMode ? Colors.white70 : Colors.black87),
+                          fontWeight: _selectedGender == 'Female'
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                        side: BorderSide(
+                          color: _selectedGender == 'Female'
+                              ? AppTheme.primaryColor
+                              : (isDarkMode
+                                    ? Colors.grey[700]!
+                                    : Colors.grey[400]!),
+                          width: _selectedGender == 'Female' ? 2 : 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_selectedGender != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _selectedGender = null;
+                        });
+                      },
+                      icon: const Icon(Icons.clear_all, size: 16),
+                      label: const Text('Clear'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: isDarkMode
+                            ? Colors.white70
+                            : Colors.black87,
+                      ),
+                    ),
+                  ),
+              ],
               const SizedBox(height: 24),
 
               // Search Button
@@ -1481,7 +1814,7 @@ class _ExploreScreenState extends State<ExploreScreen>
 
       if (mounted) {
         final errorMessage = e.toString();
-        
+
         // Check if it's a premium subscription error
         if (errorMessage.contains('PREMIUM_REQUIRED')) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1518,7 +1851,9 @@ class _ExploreScreenState extends State<ExploreScreen>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${errorMessage.replaceAll('Exception: CHAT_ERROR: ', '').replaceAll('Exception: ', '')}'),
+              content: Text(
+                'Error: ${errorMessage.replaceAll('Exception: CHAT_ERROR: ', '').replaceAll('Exception: ', '')}',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -1747,7 +2082,7 @@ class _ExploreScreenState extends State<ExploreScreen>
 
       if (mounted) {
         final errorMessage = e.toString();
-        
+
         // Check if it's a premium subscription error
         if (errorMessage.contains('PREMIUM_REQUIRED')) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1784,7 +2119,9 @@ class _ExploreScreenState extends State<ExploreScreen>
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: ${errorMessage.replaceAll('Exception: CHAT_ERROR: ', '').replaceAll('Exception: ', '')}'),
+              content: Text(
+                'Error: ${errorMessage.replaceAll('Exception: CHAT_ERROR: ', '').replaceAll('Exception: ', '')}',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -1799,10 +2136,11 @@ class _ExploreScreenState extends State<ExploreScreen>
     final email = user['email']?.toString() ?? '';
     final classGrade = student['classGrade']?.toString() ?? 'N/A';
     final schoolName = student['schoolName']?.toString() ?? 'N/A';
-    final learningGoals = student['learningGoals']?.toString() ?? 'Not specified';
+    final learningGoals =
+        student['learningGoals']?.toString() ?? 'Not specified';
     final guardianName = student['guardianName']?.toString();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Calculate distance if location data is available
     final studentLat = student['latitude'];
     final studentLon = student['longitude'];
@@ -1858,15 +2196,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isDarkMode ? Colors.white : AppTheme.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          color: isDarkMode
+                              ? Colors.white
+                              : AppTheme.textPrimary,
                         ),
                       ),
                     ],
@@ -1934,7 +2266,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                            color: isDarkMode
+                                ? Colors.white
+                                : AppTheme.textPrimary,
                           ),
                         ),
                       ),
@@ -1954,7 +2288,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                           schoolName,
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                            color: isDarkMode
+                                ? Colors.grey[300]
+                                : Colors.grey[700],
                           ),
                         ),
                       ),
@@ -1967,7 +2303,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                         Icon(
                           Icons.family_restroom,
                           size: 16,
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          color: isDarkMode
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -1975,7 +2313,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                             'Guardian: $guardianName',
                             style: TextStyle(
                               fontSize: 13,
-                              color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                              color: isDarkMode
+                                  ? Colors.grey[300]
+                                  : Colors.grey[700],
                             ),
                           ),
                         ),
@@ -2035,9 +2375,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: const [
             Icon(Icons.lock, color: Color(0xFF6C63FF), size: 28),
@@ -2078,10 +2416,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                   ),
                   Text(
                     '/month',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
               ),
@@ -2124,11 +2459,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const Icon(
-            Icons.check_circle,
-            color: Color(0xFF6C63FF),
-            size: 20,
-          ),
+          const Icon(Icons.check_circle, color: Color(0xFF6C63FF), size: 20),
           const SizedBox(width: 8),
           Text(feature),
         ],
@@ -2207,113 +2538,117 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
               child: GestureDetector(
                 onTap: widget.onTap,
                 child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.001)
-                  ..rotateX(_isHovered ? -0.05 : 0.0)
-                  ..rotateY(_isHovered ? 0.05 : 0.0),
-                child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  transform: Matrix4.translationValues(
-                    0,
-                    _isHovered ? -8 : 0,
-                    0,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: widget.subject.color.withOpacity(
-                          _isHovered ? 0.4 : 0.2,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.001)
+                    ..rotateX(_isHovered ? -0.05 : 0.0)
+                    ..rotateY(_isHovered ? 0.05 : 0.0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    transform: Matrix4.translationValues(
+                      0,
+                      _isHovered ? -8 : 0,
+                      0,
+                    ),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.subject.color.withOpacity(
+                            _isHovered ? 0.4 : 0.2,
+                          ),
+                          blurRadius: _isHovered ? 20 : 12,
+                          offset: Offset(0, _isHovered ? 12 : 6),
                         ),
-                        blurRadius: _isHovered ? 20 : 12,
-                        offset: Offset(0, _isHovered ? 12 : 6),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            widget.subject.color,
-                            widget.subject.color.withOpacity(0.8),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              widget.subject.color,
+                              widget.subject.color.withOpacity(0.8),
+                            ],
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            // Background pattern
+                            Positioned(
+                              right: -20,
+                              top: -20,
+                              child: Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: -30,
+                              bottom: -30,
+                              child: Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.1),
+                                ),
+                              ),
+                            ),
+                            // Content
+                            Padding(
+                              padding: const EdgeInsets.all(20),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          _getSubjectIcon(widget.subject.name),
+                                          color: Colors.white,
+                                          size: 32,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        widget.subject.name,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                      child: Stack(
-                        children: [
-                          // Background pattern
-                          Positioned(
-                            right: -20,
-                            top: -20,
-                            child: Container(
-                              width: 100,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.1),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: -30,
-                            bottom: -30,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.1),
-                              ),
-                            ),
-                          ),
-                          // Content
-                          Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Icon(
-                                        _getSubjectIcon(widget.subject.name),
-                                        color: Colors.white,
-                                        size: 32,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      widget.subject.name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ),
                 ),
-              ),
               ),
             ),
           ),
@@ -2336,6 +2671,18 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
         return Icons.bolt_rounded;
       case 'chemistry':
         return Icons.biotech_rounded;
+      case 'geography':
+        return Icons.public_rounded;
+      case 'hindi':
+        return Icons.translate_rounded;
+      case 'political science':
+        return Icons.account_balance_rounded;
+      case 'business studies':
+        return Icons.business_rounded;
+      case 'accountancy':
+        return Icons.account_balance_wallet_rounded;
+      case 'economics':
+        return Icons.trending_up_rounded;
       default:
         return Icons.school_rounded;
     }

@@ -1,8 +1,13 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../config/api.dart';
+import '../config/navigator_key.dart';
+import '../screens/subscription/subscription_screen.dart';
+import 'subscription_service.dart';
 
 class FCMService {
   static final FCMService _instance = FCMService._internal();
@@ -15,6 +20,7 @@ class FCMService {
 
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
+  RemoteMessage? _pendingInitialMessage; // Store initial message from terminated state
 
   /// Initialize FCM and request permissions
   Future<void> initialize() async {
@@ -57,9 +63,11 @@ class FCMService {
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageTap);
 
       // Check if app was opened from a terminated state
-      RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
-      if (initialMessage != null) {
-        _handleMessageTap(initialMessage);
+      // Store the message but don't handle it yet - wait for app to initialize
+      _pendingInitialMessage = await _firebaseMessaging.getInitialMessage();
+      if (_pendingInitialMessage != null) {
+        print('🔔 App opened from terminated state with notification');
+        print('🔔 Pending initial message: ${_pendingInitialMessage!.data}');
       }
 
       print('✅ FCM Service initialized successfully');
@@ -155,20 +163,107 @@ class FCMService {
   }
 
   /// Handle notification tap (from background)
-  void _handleMessageTap(RemoteMessage message) {
+  void _handleMessageTap(RemoteMessage message) async {
     print('🔔 Notification tapped: ${message.data}');
     final chatId = message.data['chatId'];
-    if (chatId != null) {
-      // TODO: Navigate to chat screen
-      print('Navigate to chat: $chatId');
+    if (chatId != null && navigatorKey.currentContext != null) {
+      // Check if user is premium before navigating
+      final subscriptionService = SubscriptionService();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      
+      print('🔔 Checking premium status for user: $userId');
+      
+      // First check local cache
+      final localIsPremium = await subscriptionService.isPremiumUser();
+      print('🔔 Local premium status: $localIsPremium');
+      
+      // Verify with server to ensure accuracy
+      bool isPremium = localIsPremium;
+      if (userId != null) {
+        try {
+          final status = await subscriptionService.getSubscriptionStatus(userId);
+          isPremium = status['isPremium'] ?? false;
+          print('🔔 Server premium status: $isPremium');
+        } catch (e) {
+          print('⚠️ Could not verify premium status from server: $e');
+          // Fall back to local value
+        }
+      }
+      
+      if (!isPremium) {
+        print('🔔 User is NOT premium - Redirecting to subscription page');
+        // Redirect to subscription page if not premium
+        Navigator.of(navigatorKey.currentContext!).push(
+          MaterialPageRoute(
+            builder: (context) => const SubscriptionScreen(),
+          ),
+        );
+      } else {
+        // Navigate to chat if premium
+        print('🔔 User IS premium - Navigate to chat: $chatId');
+        // TODO: Add navigation to chat screen here if needed
+      }
+    } else {
+      print('⚠️ No navigator context or chatId available');
     }
   }
 
   /// Handle local notification tap
-  void _handleNotificationTap(String payload) {
+  void _handleNotificationTap(String payload) async {
     print('🔔 Local notification tapped: $payload');
-    // TODO: Navigate to chat screen
-    print('Navigate to chat: $payload');
+    if (navigatorKey.currentContext != null) {
+      // Check if user is premium before navigating
+      final subscriptionService = SubscriptionService();
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      
+      print('🔔 Checking premium status for user: $userId');
+      
+      // First check local cache
+      final localIsPremium = await subscriptionService.isPremiumUser();
+      print('🔔 Local premium status: $localIsPremium');
+      
+      // Verify with server to ensure accuracy
+      bool isPremium = localIsPremium;
+      if (userId != null) {
+        try {
+          final status = await subscriptionService.getSubscriptionStatus(userId);
+          isPremium = status['isPremium'] ?? false;
+          print('🔔 Server premium status: $isPremium');
+        } catch (e) {
+          print('⚠️ Could not verify premium status from server: $e');
+          // Fall back to local value
+        }
+      }
+      
+      if (!isPremium) {
+        print('🔔 User is NOT premium - Redirecting to subscription page');
+        // Redirect to subscription page if not premium
+        Navigator.of(navigatorKey.currentContext!).push(
+          MaterialPageRoute(
+            builder: (context) => const SubscriptionScreen(),
+          ),
+        );
+      } else {
+        // Navigate to chat if premium
+        print('🔔 User IS premium - Navigate to chat: $payload');
+        // TODO: Add navigation to chat screen here if needed
+      }
+    } else {
+      print('⚠️ No navigator context available');
+    }
+  }
+
+  /// Handle pending initial message (called after app is fully initialized)
+  Future<void> handlePendingInitialMessage() async {
+    if (_pendingInitialMessage != null) {
+      print('🔔 Handling pending initial message after app initialization');
+      // Wait a bit for navigator to be ready
+      await Future.delayed(const Duration(milliseconds: 500));
+      _handleMessageTap(_pendingInitialMessage!);
+      _pendingInitialMessage = null; // Clear after handling
+    }
   }
 
   /// Send FCM token to backend

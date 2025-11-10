@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../services/global_notification_manager.dart';
+import '../../services/fcm_service.dart';
 import 'explore_screen.dart';
 import 'messages_screen.dart';
 import 'account_screen.dart';
@@ -26,10 +27,30 @@ class _MainNavigationState extends State<MainNavigation>
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, 2);
     _pageController = PageController(initialPage: _currentIndex);
+    print('🔔 MainNavigation initState - setting up notification manager');
     // Initialize global notification manager after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _notificationManager.initialize(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (mounted) {
+        print('🔔 MainNavigation: Initializing notification manager with context');
+        _notificationManager.initialize(context);
+        
+        // Handle pending initial message from terminated state
+        // Wait a bit more to ensure navigator is fully ready
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          await FCMService().handlePendingInitialMessage();
+        }
+      }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Update context when widget rebuilds
+    if (mounted) {
+      _notificationManager.updateContext(context);
+    }
   }
 
   @override

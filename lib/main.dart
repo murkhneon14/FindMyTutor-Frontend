@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/splash_screen.dart';
 import 'config/theme.dart' show ThemeNotifier, AppTheme;
+import 'config/navigator_key.dart';
 import 'services/fcm_service.dart';
 
 void main() async {
@@ -61,6 +62,7 @@ class FindMyTutorApp extends StatelessWidget {
       builder: (context, themeNotifier, child) {
         return OverlaySupport.global(
           child: MaterialApp(
+            navigatorKey: navigatorKey,
             title: 'FindMyTutor',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,

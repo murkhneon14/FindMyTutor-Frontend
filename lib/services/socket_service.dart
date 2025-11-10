@@ -14,17 +14,23 @@ class SocketService {
   final _chatUpdateStreamController = StreamController<Map<String, dynamic>>.broadcast();
   final _typingStreamController = StreamController<Map<String, dynamic>>.broadcast();
   final _messagesReadStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  final _premiumNotificationStreamController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get messageStream => _messageStreamController.stream;
   Stream<Map<String, dynamic>> get chatUpdateStream => _chatUpdateStreamController.stream;
   Stream<Map<String, dynamic>> get typingStream => _typingStreamController.stream;
   Stream<Map<String, dynamic>> get messagesReadStream => _messagesReadStreamController.stream;
+  Stream<Map<String, dynamic>> get premiumNotificationStream => _premiumNotificationStreamController.stream;
 
   bool get isConnected => _isConnected;
 
   void connect(String serverUrl, String userId) {
-    if (_isConnected) {
-      print('Socket already connected');
+    if (_isConnected && _socket != null) {
+      print('Socket already connected, ensuring user is joined');
+      // Make sure user is joined even if already connected
+      _socket!.emit('join', userId);
+      // Ensure listeners are set up
+      _setupSocketListeners();
       return;
     }
 
@@ -34,12 +40,23 @@ class SocketService {
         'autoConnect': false,
       });
 
+      // Set up listeners before connecting
+      _setupSocketListeners();
+
       _socket!.connect();
 
       _socket!.onConnect((_) {
-        print('Socket connected');
+        print('🔔 Socket connected successfully');
         _isConnected = true;
+        print('🔔 Joining user room: $userId');
         _socket!.emit('join', userId);
+        print('🔔 Socket listeners set up, ready to receive messages');
+        // Verify listeners are set up
+        print('🔔 Verifying socket listeners are active...');
+      });
+      
+      _socket!.onError((error) {
+        print('🔔 Socket error: $error');
       });
 
       _socket!.onDisconnect((_) {
@@ -47,33 +64,47 @@ class SocketService {
         _isConnected = false;
       });
 
-      _socket!.on('newMessage', (data) {
-        print('New message received: $data');
-        _messageStreamController.add(data);
-      });
-
-      _socket!.on('chatUpdated', (data) {
-        print('Chat updated: $data');
-        _chatUpdateStreamController.add(data);
-      });
-
-      _socket!.on('userTyping', (data) {
-        print('User typing: $data');
-        _typingStreamController.add(data);
-      });
-
-      _socket!.on('messagesRead', (data) {
-        print('Messages read: $data');
-        _messagesReadStreamController.add(data);
-      });
-
-      _socket!.on('error', (data) {
-        print('Socket error: $data');
-      });
-
     } catch (e) {
       print('Error connecting to socket: $e');
     }
+  }
+
+  void _setupSocketListeners() {
+    if (_socket == null) return;
+
+    // Set up listeners (socket.io handles duplicate listeners, so this is safe)
+    _socket!.on('newMessage', (data) {
+      print('🔔 ========== Socket: New message received ==========');
+      print('🔔 Data: $data');
+      print('🔔 Adding to message stream...');
+      _messageStreamController.add(data);
+      print('🔔 Message added to stream successfully');
+      print('🔔 ================================================');
+    });
+
+    _socket!.on('chatUpdated', (data) {
+      print('🔔 Socket: Chat updated: $data');
+      _chatUpdateStreamController.add(data);
+    });
+
+    _socket!.on('userTyping', (data) {
+      print('🔔 Socket: User typing: $data');
+      _typingStreamController.add(data);
+    });
+
+    _socket!.on('messagesRead', (data) {
+      print('🔔 Socket: Messages read: $data');
+      _messagesReadStreamController.add(data);
+    });
+
+    _socket!.on('error', (data) {
+      print('🔔 Socket: Error: $data');
+    });
+
+    _socket!.on('premiumMessageNotification', (data) {
+      print('🔔 Socket: Premium message notification received: $data');
+      _premiumNotificationStreamController.add(data);
+    });
   }
 
   void joinChat(String chatId) {
@@ -128,5 +159,6 @@ class SocketService {
     _chatUpdateStreamController.close();
     _typingStreamController.close();
     _messagesReadStreamController.close();
+    _premiumNotificationStreamController.close();
   }
 }

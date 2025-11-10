@@ -12,7 +12,7 @@ android {
     namespace = "com.findmytutor.app"
     compileSdk = flutter.compileSdkVersion
     // Pin a known-good NDK to avoid strip tool mismatches during release builds
-    ndkVersion = "25.2.9519653"
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -43,7 +43,9 @@ android {
         keystoreProperties.load(FileInputStream(keystorePropertiesFile))
         signingConfigs {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
+                // Store file path relative to android folder (parent of app folder)
+                val storeFileRelative = keystoreProperties["storeFile"] as String
+                storeFile = file(rootProject.file(storeFileRelative))
                 storePassword = keystoreProperties["storePassword"] as String
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
