@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../config/theme.dart';
 import 'signup_step2_screen.dart';
-import '../../widgets/otp_verification_dialog.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../../config/api.dart';
+import '../../services/firebase_auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -17,82 +16,261 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _phoneController = TextEditingController();
   
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
   String _userType = 'student'; // 'student' or 'teacher'
+  bool _isLoading = false;
+  bool _otpSent = false;
+  String? _verificationId;
+  int? _resendToken;
+  
+  // OTP controllers
+  final List<TextEditingController> _otpControllers = List.generate(6, (index) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
+  
+  int _resendCountdown = 0;
+  bool _canResend = false;
+  bool _isResending = false;
+
+  final FirebaseAuthService _authService = FirebaseAuthService();
 
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    for (var controller in _otpControllers) {
+      controller.dispose();
+    }
+    for (var node in _focusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _handleNext() async {
-    if (_formKey.currentState!.validate()) {
-      try {
-        final role = _userType == 'teacher' ? 'teacher' : 'student';
-        final response = await http.post(
-          Uri.parse(ApiConfig.register),
-          headers: { 'Content-Type': 'application/json' },
-          body: jsonEncode({
-            'fullName': _nameController.text.trim(),
-            'email': _emailController.text.trim(),
-            'password': _passwordController.text,
-            'role': role,
-          }),
-        );
+  void _startResendCountdown() {
+    setState(() {
+      _canResend = false;
+      _resendCountdown = 60;
+    });
+    
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted && _resendCountdown > 0) {
+        setState(() {
+          _resendCountdown--;
+          if (_resendCountdown > 0) {
+            _startResendCountdown();
+          } else {
+            _canResend = true;
+          }
+        });
+      }
+    });
+  }
 
-        if (!mounted) return;
+  Future<void> _sendOTP() async {
+    if (!_formKey.currentState!.validate()) return;
 
-        if (response.statusCode == 201) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => OTPVerificationDialog(
-              email: _emailController.text.trim(),
-              onVerified: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => SignupStep2Screen(
-                      name: _nameController.text,
-                      email: _emailController.text.trim(),
-                      password: _passwordController.text,
-                      userType: _userType,
-                    ),
-                  ),
-                );
-              },
+    setState(() => _isLoading = true);
+
+    final phone = _phoneController.text.trim();
+
+    await _authService.sendOTP(
+      phoneNumber: phone,
+      forceResendingToken: _resendToken,
+      onCodeSent: (verificationId, resendToken) {
+        setState(() {
+          _isLoading = false;
+          _otpSent = true;
+          _verificationId = verificationId;
+          _resendToken = resendToken;
+        });
+        _startResendCountdown();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('OTP sent to your phone number'),
+              backgroundColor: AppTheme.successColor,
             ),
           );
-        } else {
-          final msg = _extractError(response.body) ?? 'Registration failed';
+        }
+      },
+      onError: (error) {
+        setState(() => _isLoading = false);
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
+            SnackBar(content: Text(error)),
           );
         }
-      } catch (e) {
-        if (!mounted) return;
+      },
+      onAutoVerified: (credential) async {
+        // Auto verification (Android only)
+        setState(() => _isLoading = true);
+        await _handleCredential(credential);
+      },
+    );
+  }
+
+  Future<void> _resendOTP() async {
+    if (!_canResend || _isResending) return;
+
+    setState(() => _isResending = true);
+
+    await _authService.sendOTP(
+      phoneNumber: _phoneController.text.trim(),
+      forceResendingToken: _resendToken,
+      onCodeSent: (verificationId, resendToken) {
+        setState(() {
+          _isResending = false;
+          _verificationId = verificationId;
+          _resendToken = resendToken;
+        });
+        _startResendCountdown();
+        
+        // Clear OTP fields
+        for (var controller in _otpControllers) {
+          controller.clear();
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('OTP resent to your phone number'),
+              backgroundColor: AppTheme.successColor,
+            ),
+          );
+        }
+      },
+      onError: (error) {
+        setState(() => _isResending = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error)),
+          );
+        }
+      },
+      onAutoVerified: (credential) async {
+        setState(() => _isResending = false);
+        await _handleCredential(credential);
+      },
+    );
+  }
+
+  Future<void> _verifyOTP() async {
+    // Check if all OTP fields are filled
+    for (var controller in _otpControllers) {
+      if (controller.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error. Please try again.')),
+          const SnackBar(content: Text('Please enter the complete OTP')),
+        );
+        return;
+      }
+    }
+
+    setState(() => _isLoading = true);
+
+    final otp = _otpControllers.map((c) => c.text).join();
+
+    final result = await _authService.verifyOTP(
+      otp: otp,
+      verificationId: _verificationId,
+    );
+
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      final user = result['user'] as User;
+      await _authenticateAndProceed(user);
+    } else {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['error'] ?? 'Verification failed')),
+      );
+    }
+  }
+
+  Future<void> _handleCredential(PhoneAuthCredential credential) async {
+    try {
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      if (userCredential.user != null) {
+        await _authenticateAndProceed(userCredential.user!);
+      } else {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Verification failed')),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
         );
       }
     }
   }
 
-  String? _extractError(String body) {
-    try {
-      final map = jsonDecode(body);
-      if (map is Map && map['message'] is String) return map['message'] as String;
-    } catch (_) {}
-    return null;
+  Future<void> _authenticateAndProceed(User firebaseUser) async {
+    // Authenticate with backend
+    final result = await _authService.authenticateWithBackend(
+      firebaseUser: firebaseUser,
+      name: _nameController.text.trim(),
+      role: _userType,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result['success'] == true) {
+      // Navigate to Step 2 for profile completion
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SignupStep2Screen(
+            name: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+            userType: _userType,
+          ),
+        ),
+      );
+    } else if (result['requiresProfile'] == true) {
+      // New user needs to complete profile - same flow
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SignupStep2Screen(
+            name: _nameController.text.trim(),
+            phone: _phoneController.text.trim(),
+            userType: _userType,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['error'] ?? 'Authentication failed')),
+      );
+    }
+  }
+
+  void _onOTPChange(String value, int index) {
+    if (value.isNotEmpty) {
+      if (index < 5) {
+        _focusNodes[index + 1].requestFocus();
+      } else {
+        _focusNodes[index].unfocus();
+        _verifyOTP();
+      }
+    }
+  }
+
+  void _onOTPKeyPress(KeyEvent event, int index) {
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+      if (_otpControllers[index].text.isEmpty && index > 0) {
+        _focusNodes[index - 1].requestFocus();
+      }
+    }
   }
 
   @override
@@ -123,7 +301,13 @@ class _SignupScreenState extends State<SignupScreen> {
                           builder: (context, themeNotifier, _) {
                             final isDarkMode = themeNotifier.isDarkMode;
                             return IconButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () {
+                                if (_otpSent) {
+                                  setState(() => _otpSent = false);
+                                } else {
+                                  Navigator.pop(context);
+                                }
+                              },
                               icon: Icon(
                                 Icons.arrow_back_ios,
                                 color: isDarkMode ? Colors.white : AppTheme.textPrimary,
@@ -137,7 +321,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                         const Spacer(),
                         // Progress Indicator
-                        _buildProgressIndicator(1, 2),
+                        _buildProgressIndicator(_otpSent ? 1 : 1, 2),
                       ],
                     ),
                     const SizedBox(height: 20),
@@ -147,7 +331,7 @@ class _SignupScreenState extends State<SignupScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Create Account',
+                            _otpSent ? 'Verify Phone' : 'Create Account',
                             style: Theme.of(context)
                                 .textTheme
                                 .displayMedium
@@ -157,7 +341,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Step 1 of 2 - Basic Information',
+                            _otpSent 
+                                ? 'Enter the 6-digit code sent to +91 ${_phoneController.text}'
+                                : 'Step 1 of 2 - Basic Information',
                             style:
                                 Theme.of(context).textTheme.bodyLarge?.copyWith(
                                       color: AppTheme.textSecondary,
@@ -174,182 +360,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
                   children: [
-                    Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // User Type Selection
-                          Text(
-                            'I am a',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildUserTypeCard(
-                                  'Student/Parent',
-                                  Icons.school_outlined,
-                                  'student',
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _buildUserTypeCard(
-                                  'Teacher',
-                                  Icons.person_outline,
-                                  'teacher',
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 30),
-                          // Name Field
-                          _buildTextField(
-                            controller: _nameController,
-                            label: 'Full Name',
-                            hint: 'Enter your full name',
-                            icon: Icons.person_outline,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your name';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          // Email Field
-                          _buildTextField(
-                            controller: _emailController,
-                            label: 'Email',
-                            hint: 'Enter your email',
-                            icon: Icons.email_outlined,
-                            keyboardType: TextInputType.emailAddress,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) {
-                                return 'Please enter a valid email';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          // Password Field
-                          _buildTextField(
-                            controller: _passwordController,
-                            label: 'Password',
-                            hint: 'Create a password',
-                            icon: Icons.lock_outline,
-                            obscureText: _obscurePassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                color: AppTheme.textSecondary,
-                              ),
-                              onPressed: () {
-                                setState(
-                                    () => _obscurePassword = !_obscurePassword);
-                              },
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter a password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          // Confirm Password Field
-                          _buildTextField(
-                            controller: _confirmPasswordController,
-                            label: 'Confirm Password',
-                            hint: 'Re-enter your password',
-                            icon: Icons.lock_outline,
-                            obscureText: _obscureConfirmPassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscureConfirmPassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                                color: AppTheme.textSecondary,
-                              ),
-                              onPressed: () {
-                                setState(() => _obscureConfirmPassword =
-                                    !_obscureConfirmPassword);
-                              },
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please confirm your password';
-                              }
-                              if (value != _passwordController.text) {
-                                return 'Passwords do not match';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 40),
-                          // Next Button
-                          Container(
-                            width: double.infinity,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              gradient: AppTheme.primaryGradient,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      AppTheme.primaryColor.withOpacity(0.3),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: _handleNext,
-                                borderRadius: BorderRadius.circular(16),
-                                child: const Center(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Next',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Icon(
-                                        Icons.arrow_forward,
-                                        color: Colors.white,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 30),
-                        ],
-                      ),
-                    ),
+                    if (!_otpSent) ...[
+                      _buildSignupForm(),
+                    ] else ...[
+                      _buildOTPForm(),
+                    ],
                   ],
                 ),
               ),
@@ -357,6 +372,278 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSignupForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // User Type Selection
+          Text(
+            'I am a',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildUserTypeCard(
+                  'Student/Parent',
+                  Icons.school_outlined,
+                  'student',
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildUserTypeCard(
+                  'Teacher',
+                  Icons.person_outline,
+                  'teacher',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 30),
+          // Name Field
+          _buildTextField(
+            controller: _nameController,
+            label: 'Full Name',
+            hint: 'Enter your full name',
+            icon: Icons.person_outline,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your name';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
+          // Phone Field
+          _buildTextField(
+            controller: _phoneController,
+            label: 'Phone Number',
+            hint: 'Enter your 10-digit phone number',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone,
+            prefixText: '+91 ',
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your phone number';
+              }
+              if (value.length != 10) {
+                return 'Please enter a valid 10-digit number';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 40),
+          // Send OTP Button
+          Container(
+            width: double.infinity,
+            height: 56,
+            decoration: BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _isLoading ? null : _sendOTP,
+                borderRadius: BorderRadius.circular(16),
+                child: Center(
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Send OTP',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Icon(
+                              Icons.arrow_forward,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOTPForm() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        // OTP Input Fields
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(6, (index) {
+            return SizedBox(
+              width: 50,
+              child: KeyboardListener(
+                focusNode: FocusNode(),
+                onKeyEvent: (event) => _onOTPKeyPress(event, index),
+                child: TextFormField(
+                  controller: _otpControllers[index],
+                  focusNode: _focusNodes[index],
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: Theme.of(context).textTheme.titleLarge,
+                  decoration: InputDecoration(
+                    counterText: '',
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    filled: true,
+                    fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.white24 : Theme.of(context).dividerColor,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDarkMode ? Colors.white24 : Theme.of(context).dividerColor,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  onChanged: (value) => _onOTPChange(value, index),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 30),
+        // Verify Button
+        Container(
+          width: double.infinity,
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: AppTheme.primaryGradient,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _isLoading ? null : _verifyOTP,
+              borderRadius: BorderRadius.circular(16),
+              child: Center(
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
+                    : const Text(
+                        'Verify & Continue',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Resend OTP
+        Center(
+          child: TextButton(
+            onPressed: _canResend ? _resendOTP : null,
+            child: _isResending
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    _canResend
+                        ? 'Resend OTP'
+                        : 'Resend OTP in ${_resendCountdown}s',
+                    style: TextStyle(
+                      color: _canResend
+                          ? Theme.of(context).primaryColor
+                          : Theme.of(context).hintColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Change Number
+        Center(
+          child: TextButton(
+            onPressed: () => setState(() => _otpSent = false),
+            child: Text(
+              'Change Phone Number',
+              style: TextStyle(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -470,6 +757,8 @@ class _SignupScreenState extends State<SignupScreen> {
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputType? keyboardType,
+    String? prefixText,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -505,6 +794,7 @@ class _SignupScreenState extends State<SignupScreen> {
             obscureText: obscureText,
             keyboardType: keyboardType,
             validator: validator,
+            inputFormatters: inputFormatters,
             style: TextStyle(
               color: isDarkMode ? Colors.white : AppTheme.textPrimary,
             ),
@@ -514,6 +804,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
               ),
               prefixIcon: Icon(icon, color: AppTheme.primaryColor),
+              prefixText: prefixText,
+              prefixStyle: TextStyle(
+                color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
               suffixIcon: suffixIcon,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
