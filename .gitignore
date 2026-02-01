@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Keystore files (NEVER commit these!)
+/android/key.properties
+/android/keystore.jks
+/android/*.jks
+/android/*.keystore
+
+# Firebase (if not using git-ignored config)
+# /android/app/google-services.json
+# /ios/Runner/GoogleService-Info.plist

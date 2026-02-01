@@ -45,3 +45,7 @@ flutter build appbundle --release
 The AAB file will be at: `build/app/outputs/bundle/release/app-release.aab`
 
 
+
+
+
+

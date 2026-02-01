@@ -85,6 +85,49 @@ lib/
 - Push notifications
 - Favorites and saved tutors
 
+## Play Store Deployment
+
+### Quick Start
+See `QUICK_START.md` for quick deployment steps.
+
+### Full Guide
+See `DEPLOYMENT_GUIDE.md` for complete deployment instructions.
+
+### Checklist
+See `PLAY_STORE_CHECKLIST.md` for pre-deployment checklist.
+
+### Build Release AAB
+```bash
+flutter clean
+flutter pub get
+flutter build appbundle --release
+```
+
+The AAB file will be at: `build/app/outputs/bundle/release/app-release.aab`
+
+## Configuration
+
+### App Signing
+- Keystore configuration: `android/key.properties`
+- Template: `android/key.properties.template`
+- **Never commit** `key.properties` or `keystore.jks` to version control
+
+### Version Management
+- Update version in `pubspec.yaml`: `version: MAJOR.MINOR.PATCH+BUILD_NUMBER`
+- Increment BUILD_NUMBER for each release
+
+### Permissions
+- Location: For finding nearby tutors/students
+- Notifications: For chat and booking updates
+- Camera/Storage: For profile pictures (optional)
+
+## Security
+
+- All API calls use HTTPS
+- Sensitive data encrypted in transit
+- Payment processing via Razorpay (secure third-party)
+- User authentication required for sensitive operations
+
 ## License
 
 This project is created for educational purposes.

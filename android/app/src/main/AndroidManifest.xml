@@ -4,10 +4,34 @@
     <!-- Location Permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
+    <!-- Notification Permission for Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- Network Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    
+    <!-- Notification Permissions -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    
+    <!-- Camera and Storage Permissions (for profile pictures) -->
+    <uses-permission android:name="android.permission.CAMERA" 
+        android:required="false" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="32" 
+        android:required="false" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+        android:maxSdkVersion="28" 
+        android:required="false" />
+    
+    <!-- For Android 13+ (API 33+) media permissions -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" 
+        android:required="false" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" 
+        android:required="false" />
     
     <application
         android:usesCleartextTraffic="false"
@@ -18,7 +42,8 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:name="${applicationName}"
-        android:exported="false">
+        android:exported="false"
+        android:requestLegacyExternalStorage="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
