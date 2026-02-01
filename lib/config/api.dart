@@ -4,10 +4,31 @@ class ApiConfig {
     defaultValue: 'https://findmy-tutor-backend.onrender.com',
   );
 
-  // Auth endpoints
+  // ==========================================
+  // Firebase Phone Auth endpoints (NEW)
+  // ==========================================
+  
+  /// Main authentication endpoint - handles both login and registration
+  static String get authenticate => '$baseUrl/api/auth/authenticate';
+  
+  /// Check if phone number is already registered
+  static String get checkPhone => '$baseUrl/api/auth/check-phone';
+  
+  /// Update user email (optional)
+  static String get updateEmail => '$baseUrl/api/auth/update-email';
+
+  // ==========================================
+  // Legacy Auth endpoints (DEPRECATED)
+  // ==========================================
+  
   static String get register => '$baseUrl/api/auth/register';
   static String get verifyOtp => '$baseUrl/api/auth/verify-otp';
   static String get login => '$baseUrl/api/auth/login';
+
+  // ==========================================
+  // Profile endpoints
+  // ==========================================
+  
   static String get studentProfile => '$baseUrl/api/auth/student-profile';
   static String get teacherProfile => '$baseUrl/api/auth/teacher-profile';
   static String get me => '$baseUrl/api/auth/me';

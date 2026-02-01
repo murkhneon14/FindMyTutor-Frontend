@@ -12,16 +12,16 @@ import 'package:geolocator/geolocator.dart';
 
 class SignupStep2Screen extends StatefulWidget {
   final String name;
-  final String email;
-  final String password;
+  final String phone; // Already verified via Firebase
   final String userType; // 'student' or 'teacher'
+  final String? email; // Optional
 
   const SignupStep2Screen({
     super.key,
     required this.name,
-    required this.email,
-    required this.password,
+    required this.phone,
     required this.userType,
+    this.email,
   });
 
   @override
@@ -35,7 +35,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   final _instituteController = TextEditingController();
   final _gradeController = TextEditingController();
   final _guardianNameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController(); // Optional email
   final _addressController = TextEditingController();
   final _bioController = TextEditingController();
   
@@ -97,7 +97,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     _instituteController.dispose();
     _gradeController.dispose();
     _guardianNameController.dispose();
-    _phoneController.dispose();
+    _emailController.dispose();
     _addressController.dispose();
     _bioController.dispose();
     super.dispose();
@@ -196,13 +196,6 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             return;
           }
           
-          if (_phoneController.text.trim().isEmpty) {
-            setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please enter your phone number')),
-            );
-            return;
-          }
 
           // Check if location is available
           if (_currentLocation == null) {
@@ -217,7 +210,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
           }
 
           final teacherData = {
-            'phone': _phoneController.text.trim(),
+            'phone': widget.phone, // Already verified
+            'email': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
             'dob': _selectedDob?.toIso8601String(),
             'gender': _selectedGender!.toLowerCase(),
             'qualifications': _instituteController.text.trim(),
@@ -253,7 +247,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
 
           // Student profile with location
           final studentData = {
-            'phone': _phoneController.text.trim(),
+            'phone': widget.phone, // Already verified
+            'email': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
             'dob': _selectedDob?.toIso8601String(),
             'gender': (_selectedGender ?? '').toLowerCase(),
             'classGrade': _gradeController.text.trim(),
@@ -453,23 +448,20 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Phone Number
+                          // Verified Phone Number (Read-only display)
+                          _buildVerifiedPhoneDisplay(),
+                          const SizedBox(height: 20),
+                          
+                          // Optional Email
                           _buildTextField(
-                            controller: _phoneController,
-                            label: 'Phone Number',
-                            hint: 'Enter your phone number',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              LengthLimitingTextInputFormatter(10),
-                            ],
+                            controller: _emailController,
+                            label: 'Email (Optional)',
+                            hint: 'Enter your email address',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
                             validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your phone number';
-                              }
-                              if (value.length != 10) {
-                                return 'Please enter a valid 10-digit number';
+                              if (value != null && value.isNotEmpty && !value.contains('@')) {
+                                return 'Please enter a valid email';
                               }
                               return null;
                             },
@@ -1047,6 +1039,90 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildVerifiedPhoneDisplay() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Phone Number',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: AppTheme.successColor.withOpacity(0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode 
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.phone_outlined,
+                color: AppTheme.successColor,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '+91 ${widget.phone}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.verified,
+                      color: AppTheme.successColor,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Verified',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.successColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
