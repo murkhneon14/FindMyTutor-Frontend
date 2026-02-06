@@ -6,14 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api.dart';
 import 'fcm_service.dart';
 
-/// Service to handle Firebase Phone Authentication
+/// Service to handle Firebase Phone Authentication (production).
 class FirebaseAuthService {
   static final FirebaseAuthService _instance = FirebaseAuthService._internal();
   factory FirebaseAuthService() => _instance;
   FirebaseAuthService._internal();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  
+
   String? _verificationId;
   int? _resendToken;
   bool _isVerifying = false;
@@ -70,9 +70,9 @@ class FirebaseAuthService {
           onAutoVerified(credential);
         },
         verificationFailed: (FirebaseAuthException e) {
-          debugPrint('Verification failed: ${e.message}');
+          debugPrint('Verification failed: ${e.code} - ${e.message}');
           _isVerifying = false;
-          
+
           String errorMessage = 'Verification failed';
           if (e.code == 'invalid-phone-number') {
             errorMessage = 'Invalid phone number format';
@@ -80,10 +80,14 @@ class FirebaseAuthService {
             errorMessage = 'Too many requests. Please try again later';
           } else if (e.code == 'quota-exceeded') {
             errorMessage = 'SMS quota exceeded. Please try again later';
+          } else if (e.message != null && e.message!.contains('BILLING_NOT_ENABLED')) {
+            errorMessage = 'Phone verification is not available. Please try again later.';
+          } else if (e.message != null && e.message!.toLowerCase().contains('recaptcha')) {
+            errorMessage = 'Verification is temporarily unavailable. Please try again later.';
           } else {
             errorMessage = e.message ?? 'Verification failed';
           }
-          
+
           onError(errorMessage);
         },
         codeSent: (String verificationId, int? resendToken) {
