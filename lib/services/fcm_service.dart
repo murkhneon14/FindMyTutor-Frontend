@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../config/api.dart';
 import '../config/navigator_key.dart';
+import '../models/notification_item.dart';
 import '../screens/subscription/subscription_screen.dart';
+import 'notification_storage_service.dart';
 import 'subscription_service.dart';
 
 class FCMService {
@@ -119,11 +121,23 @@ class FCMService {
 
     // Show local notification when app is in foreground
     if (message.notification != null) {
+      final title = message.notification!.title ?? 'New Message';
+      final body = message.notification!.body ?? '';
+      final chatId = message.data['chatId']?.toString();
       _showLocalNotification(
-        title: message.notification!.title ?? 'New Message',
-        body: message.notification!.body ?? '',
-        payload: message.data['chatId'],
+        title: title,
+        body: body,
+        payload: chatId,
       );
+      // Save to notification storage
+      NotificationStorageService.addNotification(NotificationItem(
+        id: 'fcm_${DateTime.now().millisecondsSinceEpoch}',
+        title: title,
+        body: body,
+        createdAt: DateTime.now(),
+        chatId: chatId,
+        type: 'chat',
+      ));
     }
   }
 

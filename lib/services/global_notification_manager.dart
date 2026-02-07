@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'socket_service.dart';
 import 'notification_service.dart';
+import 'notification_storage_service.dart';
 import '../models/chat_message.dart';
+import '../models/notification_item.dart';
 import '../screens/subscription/subscription_screen.dart';
 import 'subscription_service.dart';
 import '../config/navigator_key.dart';
@@ -66,7 +68,18 @@ class GlobalNotificationManager {
               
               if (message.senderId != _currentUserId && chatId != _currentChatId) {
                 print('🔔 ✅ Conditions met - Showing notification for message from ${message.senderName}');
-                
+
+                // Save to notification storage
+                NotificationStorageService.addNotification(NotificationItem(
+                  id: 'msg_${message.id}_${DateTime.now().millisecondsSinceEpoch}',
+                  title: message.senderName,
+                  body: message.text,
+                  createdAt: DateTime.now(),
+                  chatId: chatId,
+                  senderId: message.senderId,
+                  type: 'chat',
+                ));
+
                 // Use navigatorKey context if available, otherwise use stored context
                 final notificationContext = navigatorKey.currentContext ?? _context;
                 print('🔔 Notification context check:');
@@ -166,7 +179,17 @@ class GlobalNotificationManager {
               print('🔔 ✅ Chat update conditions met - Showing notification');
               // Update last notified count
               _lastNotifiedUnreadCount[chatId] = unreadCount;
-              
+
+              // Save to notification storage
+              NotificationStorageService.addNotification(NotificationItem(
+                id: 'chat_${chatId}_${DateTime.now().millisecondsSinceEpoch}',
+                title: 'New Message',
+                body: lastMessage,
+                createdAt: DateTime.now(),
+                chatId: chatId,
+                type: 'chat',
+              ));
+
               final notificationContext = navigatorKey.currentContext ?? _context;
               if (notificationContext != null && notificationContext.mounted) {
                 // Show a generic notification for chat update

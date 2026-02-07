@@ -12,6 +12,8 @@ import '../../models/chat_room.dart';
 import '../chat_screen.dart';
 import '../../services/subscription_service.dart';
 import '../subscription/subscription_screen.dart';
+import 'notifications_bottom_sheet.dart';
+import '../../services/notification_storage_service.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -39,6 +41,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   String? _currentUserName;
   String? _userRole; // Track user role (teacher/student)
   int _currentBannerPage = 0;
+  int _unreadNotificationCount = 0;
 
   final List<Subject> _subjects = [
     Subject(
@@ -134,6 +137,7 @@ class _ExploreScreenState extends State<ExploreScreen>
     _bannerController = PageController(viewportFraction: 0.9);
     _getCurrentLocation();
     _loadCurrentUser();
+    _loadUnreadNotificationCount();
     _startAutoScroll();
   }
 
@@ -225,6 +229,68 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
 
     print('User role loaded: $_userRole');
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    final count = await NotificationStorageService.getUnreadCount();
+    if (mounted) {
+      setState(() => _unreadNotificationCount = count);
+    }
+  }
+
+  void _showNotificationsSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const NotificationsBottomSheet(),
+    );
+    _loadUnreadNotificationCount();
+  }
+
+  Widget _buildNotificationIcon() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: AppTheme.primaryColor.withOpacity(0.2),
+              width: 2,
+            ),
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: _showNotificationsSheet,
+            color: AppTheme.primaryColor,
+            tooltip: 'Notifications',
+          ),
+        ),
+        if (_unreadNotificationCount > 0)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              child: Text(
+                _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -914,39 +980,47 @@ class _ExploreScreenState extends State<ExploreScreen>
                         AppTheme.primaryGradient.createShader(bounds),
                     child: Text(
                       ' Tutor',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.displayMedium?.copyWith(color: Colors.white),
+                      style: Theme.of(context)
+                          .textTheme
+                          .displayMedium
+                          ?.copyWith(color: Colors.white),
                     ),
                   ),
                 ],
               ),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppTheme.primaryColor.withOpacity(0.2),
-                    width: 2,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildNotificationIcon(),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppTheme.primaryColor.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: IconButton(
+                      icon: _isLoadingLocation
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _currentLocation != null
+                                  ? Icons.location_on
+                                  : Icons.location_off,
+                            ),
+                      onPressed: _getCurrentLocation,
+                      color: AppTheme.primaryColor,
+                      tooltip: _currentLocation != null
+                          ? 'Location: ${_currentLocation!.latitude.toStringAsFixed(2)}, ${_currentLocation!.longitude.toStringAsFixed(2)}'
+                          : 'Get Location',
+                    ),
                   ),
-                ),
-                child: IconButton(
-                  icon: _isLoadingLocation
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(
-                          _currentLocation != null
-                              ? Icons.location_on
-                              : Icons.location_off,
-                        ),
-                  onPressed: _getCurrentLocation,
-                  color: AppTheme.primaryColor,
-                  tooltip: _currentLocation != null
-                      ? 'Location: ${_currentLocation!.latitude.toStringAsFixed(2)}, ${_currentLocation!.longitude.toStringAsFixed(2)}'
-                      : 'Get Location',
-                ),
+                ],
               ),
             ],
           ),
