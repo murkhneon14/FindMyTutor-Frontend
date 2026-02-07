@@ -158,54 +158,60 @@ class _ExploreScreenState extends State<ExploreScreen>
     String? userName = prefs.getString('user_name');
     String? userRole = prefs.getString('user_role');
 
-    // If user data is not in SharedPreferences, try to fetch it from the API
-    if (userId == null || userName == null) {
-      final token = prefs.getString('auth_token');
-      if (token != null) {
-        try {
-          final response = await http
-              .get(
-                Uri.parse(ApiConfig.me),
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': 'Bearer $token',
-                },
-              )
-              .timeout(
-                const Duration(seconds: 10),
-                onTimeout: () {
-                  throw Exception(
-                    'Request timeout - please check your internet connection',
-                  );
-                },
-              );
-
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            final user = data['user'] ?? data;
-
-            userId = user['_id']?.toString() ?? user['id']?.toString();
-            userName = user['name']?.toString();
-            final userEmail = user['email']?.toString();
-            userRole = user['role']?.toString();
-
-            // Save to SharedPreferences for future use
-            if (userId != null) await prefs.setString('user_id', userId);
-            if (userName != null) await prefs.setString('user_name', userName);
-            if (userEmail != null)
-              await prefs.setString('user_email', userEmail);
-            if (userRole != null) await prefs.setString('user_role', userRole);
-
-            print(
-              '✅ Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole',
+    // Fetch profile from API when we have token (to get correct role including teacherProfile)
+    final token = prefs.getString('auth_token');
+    if (token != null) {
+      try {
+        final response = await http
+            .get(
+              Uri.parse(ApiConfig.me),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+            )
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                throw Exception(
+                  'Request timeout - please check your internet connection',
+                );
+              },
             );
-          } else {
-            print('❌ Error fetching profile: HTTP ${response.statusCode}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final user = data['user'] ?? data;
+
+          userId = user['_id']?.toString() ?? user['id']?.toString();
+          userName = user['name']?.toString();
+          final userEmail = user['email']?.toString();
+          userRole = user['role']?.toString();
+
+          // If user has teacherProfile, treat as teacher for search section
+          final teacherProfile = user['teacherProfile'];
+          if (teacherProfile != null &&
+              teacherProfile is Map &&
+              teacherProfile.isNotEmpty) {
+            userRole = 'teacher';
           }
-        } catch (e) {
-          print('❌ Error fetching profile: $e');
-          // Continue with cached data if available
+
+          // Save to SharedPreferences for future use
+          if (userId != null) await prefs.setString('user_id', userId);
+          if (userName != null) await prefs.setString('user_name', userName);
+          if (userEmail != null)
+            await prefs.setString('user_email', userEmail);
+          if (userRole != null) await prefs.setString('user_role', userRole);
+
+          print(
+            '✅ Fetched and saved user data: ID=$userId, Name=$userName, Role=$userRole',
+          );
+        } else {
+          print('❌ Error fetching profile: HTTP ${response.statusCode}');
         }
+      } catch (e) {
+        print('❌ Error fetching profile: $e');
+        // Continue with cached data if available
       }
     }
 
@@ -1702,7 +1708,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No teachers found',
+                        _userRole == 'teacher'
+                            ? 'No students found'
+                            : 'No teachers found',
                         style: TextStyle(
                           fontSize: 16,
                           color: isDarkMode ? Colors.white70 : Colors.grey[600],
