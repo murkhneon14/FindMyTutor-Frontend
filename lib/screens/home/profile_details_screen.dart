@@ -185,6 +185,12 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
       debugPrint('Profile update response: ${response.statusCode} - ${response.body}');
 
       if (response.statusCode == 200) {
+        // Update user name if changed
+        if (_nameController.text.trim().isNotEmpty &&
+            _nameController.text.trim() != _userData['name']) {
+          await _updateName(token);
+        }
+        
         // Also update email if changed
         if (_emailController.text.trim().isNotEmpty &&
             _emailController.text.trim() != _userData['email']) {
@@ -209,6 +215,26 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Future<void> _updateName(String token) async {
+    try {
+      final response = await http.put(
+        Uri.parse(ApiConfig.updateProfile),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'name': _nameController.text.trim()}),
+      );
+
+      if (response.statusCode != 200) {
+        final data = jsonDecode(response.body);
+        _showError(data['message'] ?? 'Failed to update name');
+      }
+    } catch (e) {
+      debugPrint('Error updating name: $e');
     }
   }
 
