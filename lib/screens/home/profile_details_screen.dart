@@ -345,15 +345,29 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                 if (!_isEditing)
                   Padding(
                     padding: const EdgeInsets.only(right: 16),
-                    child: IconButton(
+                    child: TextButton(
                       onPressed: () => setState(() => _isEditing = true),
-                      icon: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white.withOpacity(0.2),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined, color: Colors.white, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -590,12 +604,15 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                         const SizedBox(height: 16),
                         _buildEditableCard(
                           children: [
-                            _buildEditableField(
-                              icon: Icons.class_,
-                              label: 'Class / Grade',
-                              controller: _classGradeController,
-                              enabled: _isEditing,
-                            ),
+                            if (_isEditing)
+                              _buildClassGradeSelector()
+                            else
+                              _buildEditableField(
+                                icon: Icons.class_,
+                                label: 'Class / Grade',
+                                controller: _classGradeController,
+                                enabled: false,
+                              ),
                             _buildDivider(),
                             _buildEditableField(
                               icon: Icons.business,
@@ -1128,6 +1145,109 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                       ],
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClassGradeSelector() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final classGrades = [
+      '1st',
+      '2nd',
+      '3rd',
+      '4th',
+      '5th',
+      '6th',
+      '7th',
+      '8th',
+      '9th',
+      '10th',
+      '11th',
+      '12th',
+      'Bachelor\'s',
+      'Master\'s',
+      'PhD',
+    ];
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.white.withOpacity(0.1)
+                  : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.class_,
+              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Class / Grade',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<String>(
+                  value: _classGradeController.text.isEmpty 
+                      ? null 
+                      : classGrades.contains(_classGradeController.text) 
+                          ? _classGradeController.text 
+                          : null,
+                  hint: Text(
+                    'Select your class',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+                  ),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    filled: true,
+                    fillColor: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                  ),
+                  dropdownColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+                  items: classGrades.map((String grade) {
+                    return DropdownMenuItem<String>(
+                      value: grade,
+                      child: Text(grade),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _classGradeController.text = newValue;
+                      });
+                    }
+                  },
                 ),
               ],
             ),

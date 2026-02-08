@@ -263,6 +263,26 @@ class _AccountScreenState extends State<AccountScreen> {
                                 color: Colors.white,
                               ),
                             ),
+                          if (!_loading && _user != null && _user!['phone'] != null && (_user!['phone'] as String).isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.phone,
+                                  color: Colors.white70,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _user!['phone'] as String,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 4),
                           Text(
                             (_user != null
