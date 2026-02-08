@@ -31,6 +31,8 @@ class ApiConfig {
   
   static String get studentProfile => '$baseUrl/api/auth/student-profile';
   static String get teacherProfile => '$baseUrl/api/auth/teacher-profile';
+  static String get updateStudentProfile => '$baseUrl/api/auth/student-profile';
+  static String get updateTeacherProfile => '$baseUrl/api/auth/teacher-profile';
   static String get me => '$baseUrl/api/auth/me';
 
   // Search endpoints

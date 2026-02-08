@@ -170,7 +170,13 @@ class _AccountScreenState extends State<AccountScreen> {
                   topLeft: Radius.circular(24),
                   topRight: Radius.circular(24),
                 ),
-                child: ProfileDetailsScreen(user: _user),
+                child: ProfileDetailsScreen(
+                  user: _user,
+                  onProfileUpdated: () {
+                    Navigator.pop(context);
+                    _bootstrap(); // Refresh user data
+                  },
+                ),
               ),
             ),
           ],

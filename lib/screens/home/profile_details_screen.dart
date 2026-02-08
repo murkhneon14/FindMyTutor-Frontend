@@ -1,300 +1,719 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/theme.dart';
+import '../../config/api.dart';
 
-class ProfileDetailsScreen extends StatelessWidget {
+class ProfileDetailsScreen extends StatefulWidget {
   final Map<String, dynamic>? user;
+  final VoidCallback? onProfileUpdated;
 
-  const ProfileDetailsScreen({super.key, required this.user});
+  const ProfileDetailsScreen({
+    super.key,
+    required this.user,
+    this.onProfileUpdated,
+  });
 
-  void _showEditDialog(
-    BuildContext context,
-    String field,
-    String currentValue,
-  ) {
-    final controller = TextEditingController(text: currentValue);
-    final formKey = GlobalKey<FormState>();
+  @override
+  State<ProfileDetailsScreen> createState() => _ProfileDetailsScreenState();
+}
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Edit $field'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: controller,
-            decoration: InputDecoration(
-              labelText: field,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter $field';
-              }
-              if (field == 'Email' && !value.contains('@')) {
-                return 'Please enter a valid email';
-              }
-              return null;
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) {
-                // In a real app, you would update the user's data here
-                // For now, we'll just close the dialog
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('$field updated successfully'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
+class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
+    with SingleTickerProviderStateMixin {
+  late Map<String, dynamic> _userData;
+  bool _isEditing = false;
+  bool _isSaving = false;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+
+  // Form controllers
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _classGradeController;
+  late TextEditingController _schoolNameController;
+  late TextEditingController _guardianNameController;
+  late TextEditingController _learningGoalsController;
+  late TextEditingController _addressController;
+  late TextEditingController _qualificationsController;
+  late TextEditingController _experienceController;
+  late TextEditingController _subjectsController;
+  late TextEditingController _feesController;
+  late TextEditingController _timingsController;
+  late TextEditingController _bioController;
+
+  String? _selectedGender;
+  DateTime? _selectedDob;
+
+  @override
+  void initState() {
+    super.initState();
+    _userData = Map<String, dynamic>.from(widget.user ?? {});
+    _initControllers();
+
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
+  }
+
+  void _initControllers() {
+    _nameController = TextEditingController(text: _userData['name']?.toString() ?? '');
+    _emailController = TextEditingController(text: _userData['email']?.toString() ?? '');
+    
+    // Student profile data
+    final studentProfile = _userData['studentProfile'] as Map<String, dynamic>?;
+    _classGradeController = TextEditingController(text: studentProfile?['classGrade']?.toString() ?? '');
+    _schoolNameController = TextEditingController(text: studentProfile?['schoolName']?.toString() ?? '');
+    _guardianNameController = TextEditingController(text: studentProfile?['guardianName']?.toString() ?? '');
+    _learningGoalsController = TextEditingController(text: studentProfile?['learningGoals']?.toString() ?? '');
+    _addressController = TextEditingController(text: studentProfile?['address']?.toString() ?? '');
+    
+    // Teacher profile data
+    final teacherProfile = _userData['teacherProfile'] as Map<String, dynamic>?;
+    _qualificationsController = TextEditingController(text: teacherProfile?['qualifications']?.toString() ?? '');
+    _experienceController = TextEditingController(text: teacherProfile?['experience']?.toString() ?? '');
+    _subjectsController = TextEditingController(text: _formatSubjects(teacherProfile?['subjects']));
+    _feesController = TextEditingController(text: teacherProfile?['fees']?.toString() ?? '');
+    _timingsController = TextEditingController(text: teacherProfile?['timings']?.toString() ?? '');
+    _bioController = TextEditingController(text: teacherProfile?['bio']?.toString() ?? '');
+
+    // Get gender from either student or teacher profile
+    final profileData = studentProfile ?? teacherProfile;
+    _selectedGender = _capitalizeFirst(profileData?['gender']?.toString() ?? '');
+    if (_selectedGender?.isEmpty ?? true) _selectedGender = null;
+
+    // Parse DOB
+    final dobString = profileData?['dob']?.toString();
+    if (dobString != null && dobString.isNotEmpty) {
+      try {
+        _selectedDob = DateTime.parse(dobString);
+      } catch (_) {}
+    }
+  }
+
+  String _formatSubjects(dynamic subjects) {
+    if (subjects == null) return '';
+    if (subjects is List) {
+      return subjects.join(', ');
+    }
+    return subjects.toString();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
+    _classGradeController.dispose();
+    _schoolNameController.dispose();
+    _guardianNameController.dispose();
+    _learningGoalsController.dispose();
+    _addressController.dispose();
+    _qualificationsController.dispose();
+    _experienceController.dispose();
+    _subjectsController.dispose();
+    _feesController.dispose();
+    _timingsController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  bool get _isTeacher => _userData['role']?.toString() == 'teacher';
+
+  Future<void> _saveProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) {
+        _showError('Session expired. Please login again.');
+        return;
+      }
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+
+      // Update profile based on user type
+      final endpoint = _isTeacher
+          ? ApiConfig.updateTeacherProfile
+          : ApiConfig.updateStudentProfile;
+
+      Map<String, dynamic> profileData;
+      
+      if (_isTeacher) {
+        profileData = {
+          'gender': _selectedGender?.toLowerCase(),
+          'dob': _selectedDob?.toIso8601String(),
+          'qualifications': _qualificationsController.text.trim(),
+          'experience': _experienceController.text.trim(),
+          'subjects': _subjectsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+          'fees': int.tryParse(_feesController.text.trim()) ?? 0,
+          'timings': _timingsController.text.trim(),
+        };
+      } else {
+        profileData = {
+          'gender': _selectedGender?.toLowerCase(),
+          'dob': _selectedDob?.toIso8601String(),
+          'classGrade': _classGradeController.text.trim(),
+          'schoolName': _schoolNameController.text.trim(),
+          'guardianName': _guardianNameController.text.trim(),
+          'learningGoals': _learningGoalsController.text.trim(),
+          'address': _addressController.text.trim(),
+        };
+      }
+
+      debugPrint('Updating profile with: ${jsonEncode(profileData)}');
+
+      final response = await http.put(
+        Uri.parse(endpoint),
+        headers: headers,
+        body: jsonEncode(profileData),
+      );
+
+      debugPrint('Profile update response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        // Also update email if changed
+        if (_emailController.text.trim().isNotEmpty &&
+            _emailController.text.trim() != _userData['email']) {
+          await _updateEmail(token);
+        }
+
+        if (mounted) {
+          _showSuccess('Profile updated successfully!');
+          setState(() {
+            _isEditing = false;
+          });
+          widget.onProfileUpdated?.call();
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        _showError(data['message'] ?? 'Failed to update profile');
+      }
+    } catch (e) {
+      debugPrint('Error updating profile: $e');
+      _showError('Network error. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _updateEmail(String token) async {
+    try {
+      final response = await http.put(
+        Uri.parse(ApiConfig.updateEmail),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'email': _emailController.text.trim()}),
+      );
+
+      if (response.statusCode != 200) {
+        final data = jsonDecode(response.body);
+        _showError(data['message'] ?? 'Failed to update email');
+      }
+    } catch (e) {
+      debugPrint('Error updating email: $e');
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.errorColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDob ?? DateTime(DateTime.now().year - 18),
+      firstDate: DateTime(1940),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppTheme.primaryColor,
+              onPrimary: Colors.white,
+              surface: Theme.of(context).cardColor,
+              onSurface: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() => _selectedDob = picked);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: isDarkMode
-          ? AppTheme.darkBackgroundColor
-          : Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('Profile Details'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              // Show options for what to edit
-              showModalBottomSheet(
-                context: context,
-                builder: (context) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.person),
-                      title: const Text('Edit Name'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        _showEditDialog(
-                          context,
-                          'Name',
-                          user?['name']?.toString() ?? '',
-                        );
-                      },
-                    ),
-                    if (user?['email'] != null)
-                      ListTile(
-                        leading: const Icon(Icons.email),
-                        title: const Text('Edit Email'),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _showEditDialog(
-                            context,
-                            'Email',
-                            user!['email']?.toString() ?? '',
-                          );
-                        },
-                      ),
-                    ListTile(
-                      leading: const Icon(Icons.close),
-                      title: const Text('Cancel'),
-                      onTap: () => Navigator.pop(context),
-                    ),
-                  ],
+      backgroundColor: isDarkMode ? AppTheme.darkBackgroundColor : const Color(0xFFF8FAFC),
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: CustomScrollView(
+          slivers: [
+            // Hero Header with Profile Avatar
+            SliverAppBar(
+              expandedHeight: 280,
+              pinned: true,
+              stretch: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
                 ),
-              );
-            },
-          ),
-        ],
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Profile Header - Simplified
-            Padding(
-              padding: const EdgeInsets.only(top: 20, bottom: 10),
-              child: Column(
-                children: [
-                  // Profile Avatar
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.grey[800]!.withOpacity(0.5)
-                          : Theme.of(context).primaryColor.withOpacity(0.1),
-                      border: Border.all(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
+              ),
+              actions: [
+                if (!_isEditing)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: IconButton(
+                      onPressed: () => setState(() => _isEditing = true),
+                      icon: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ),
+              ],
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppTheme.primaryColor,
+                        AppTheme.primaryColor.withBlue(255),
+                        AppTheme.accentColor,
                       ],
                     ),
-                    child: Icon(
-                      Icons.person,
-                      size: 50,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70
-                          : Theme.of(context).primaryColor,
-                    ),
                   ),
-                  const SizedBox(height: 16),
-
-                  // User Name
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      user?['name']?.toString() ?? 'User',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).textTheme.bodyLarge?.color,
+                  child: Stack(
+                    children: [
+                      // Decorative circles
+                      Positioned(
+                        top: -50,
+                        right: -50,
+                        child: Container(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.1),
                           ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-
-                  // User Email
-                  if (user?['email'] != null) ...[
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Text(
-                        user!['email']?.toString() ?? '',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white70
-                              : Colors.grey[700],
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                ],
+                      Positioned(
+                        bottom: -30,
+                        left: -30,
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.08),
+                          ),
+                        ),
+                      ),
+                      // Profile content
+                      SafeArea(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 20),
+                              // Avatar with ring
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: Colors.white,
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 50,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              // Name
+                              Text(
+                                _userData['name']?.toString() ?? 'User',
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              // Role badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _isTeacher ? Icons.school : Icons.person,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      _capitalizeFirst(_userData['role']?.toString() ?? 'User'),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
 
-            // Profile Details
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  _buildSectionHeader(
-                    'Personal Information',
-                    Icons.person_outline,
-                    context,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailCard(
-                    context: context,
-                    items: [
-                      if (user?['name'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.person,
-                          label: 'Full Name',
-                          value: user!['name']?.toString() ?? 'Not provided',
-                        ),
-                      if (user?['email'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.email,
-                          label: 'Email',
-                          value: user!['email']?.toString() ?? 'Not provided',
-                        ),
-                      if (user?['phone'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.phone,
-                          label: 'Phone',
-                          value: user!['phone']?.toString() ?? 'Not provided',
-                        ),
-                      if (user?['gender'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.transgender,
-                          label: 'Gender',
-                          value: _capitalizeFirst(
-                            user!['gender']?.toString() ?? 'Not specified',
+            // Form Content
+            SliverToBoxAdapter(
+              child: Form(
+                key: _formKey,
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Personal Information Section
+                      _buildSectionHeader('Personal Information', Icons.person_outline),
+                      const SizedBox(height: 16),
+                      _buildEditableCard(
+                        children: [
+                          _buildEditableField(
+                            icon: Icons.person,
+                            label: 'Full Name',
+                            controller: _nameController,
+                            enabled: _isEditing,
+                            validator: (v) => v?.isEmpty ?? true ? 'Name is required' : null,
                           ),
-                        ),
-                      if (user?['dateOfBirth'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.cake,
-                          label: 'Date of Birth',
-                          value: _formatDate(user!['dateOfBirth']),
-                        ),
-                    ],
-                  ),
+                          _buildDivider(),
+                          _buildEditableField(
+                            icon: Icons.email,
+                            label: 'Email',
+                            controller: _emailController,
+                            enabled: _isEditing,
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          _buildDivider(),
+                          _buildReadOnlyField(
+                            icon: Icons.phone,
+                            label: 'Phone Number',
+                            value: _userData['phone']?.toString() ?? 'Not provided',
+                            isLocked: true,
+                          ),
+                          _buildDivider(),
+                          if (_isEditing)
+                            _buildGenderSelector()
+                          else
+                            _buildReadOnlyField(
+                              icon: Icons.transgender,
+                              label: 'Gender',
+                              value: _selectedGender ?? 'Not specified',
+                            ),
+                          _buildDivider(),
+                          if (_isEditing)
+                            _buildDateField()
+                          else
+                            _buildReadOnlyField(
+                              icon: Icons.cake,
+                              label: 'Date of Birth',
+                              value: _selectedDob != null
+                                  ? _formatDate(_selectedDob!)
+                                  : 'Not specified',
+                            ),
+                        ],
+                      ),
 
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(
-                    'Account Information',
-                    Icons.account_circle_outlined,
-                    context,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDetailCard(
-                    context: context,
-                    items: [
-                      if (user?['userType'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.category,
-                          label: 'Account Type',
-                          value: _capitalizeFirst(
-                            user!['userType']?.toString() ?? 'User',
+                      const SizedBox(height: 28),
+
+                      // Role-specific section
+                      if (_isTeacher) ...[
+                        _buildSectionHeader('Teaching Details', Icons.school),
+                        const SizedBox(height: 16),
+                        _buildEditableCard(
+                          children: [
+                            _buildEditableField(
+                              icon: Icons.menu_book,
+                              label: 'Subjects',
+                              controller: _subjectsController,
+                              enabled: _isEditing,
+                              hint: 'e.g., Mathematics, Physics',
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.school,
+                              label: 'Qualifications',
+                              controller: _qualificationsController,
+                              enabled: _isEditing,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.work,
+                              label: 'Years of Experience',
+                              controller: _experienceController,
+                              enabled: _isEditing,
+                              keyboardType: TextInputType.number,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.currency_rupee,
+                              label: 'Fees (per hour)',
+                              controller: _feesController,
+                              enabled: _isEditing,
+                              keyboardType: TextInputType.number,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.schedule,
+                              label: 'Available Timings',
+                              controller: _timingsController,
+                              enabled: _isEditing,
+                              hint: 'e.g., Mon-Fri, 4PM-8PM',
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        _buildSectionHeader('Academic Details', Icons.school),
+                        const SizedBox(height: 16),
+                        _buildEditableCard(
+                          children: [
+                            _buildEditableField(
+                              icon: Icons.class_,
+                              label: 'Class / Grade',
+                              controller: _classGradeController,
+                              enabled: _isEditing,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.business,
+                              label: 'School / College Name',
+                              controller: _schoolNameController,
+                              enabled: _isEditing,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.family_restroom,
+                              label: 'Guardian Name',
+                              controller: _guardianNameController,
+                              enabled: _isEditing,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.location_on,
+                              label: 'Address',
+                              controller: _addressController,
+                              enabled: _isEditing,
+                              maxLines: 2,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
+                              icon: Icons.lightbulb_outline,
+                              label: 'Learning Goals',
+                              controller: _learningGoalsController,
+                              enabled: _isEditing,
+                              maxLines: 2,
+                              hint: 'What do you want to learn?',
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      const SizedBox(height: 28),
+
+                      // Account Information
+                      _buildSectionHeader('Account Information', Icons.info_outline),
+                      const SizedBox(height: 16),
+                      _buildEditableCard(
+                        children: [
+                          _buildReadOnlyField(
+                            icon: Icons.calendar_today,
+                            label: 'Member Since',
+                            value: _formatDateTime(_userData['createdAt']),
                           ),
+                          _buildDivider(),
+                          _buildPremiumStatus(),
+                        ],
+                      ),
+
+                      const SizedBox(height: 32),
+
+                      // Save/Cancel buttons when editing
+                      if (_isEditing) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setState(() => _isEditing = false);
+                                  _initControllers();
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  side: BorderSide(
+                                    color: isDarkMode ? Colors.white38 : Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDarkMode ? Colors.white70 : Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 2,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: AppTheme.primaryGradient,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppTheme.primaryColor.withOpacity(0.4),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: _isSaving ? null : _saveProfile,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: _isSaving
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2.5,
+                                          ),
+                                        )
+                                      : const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.save, color: Colors.white),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Save Changes',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      if (user?['createdAt'] != null)
-                        _buildDetailItem(
-                          context: context,
-                          icon: Icons.calendar_today,
-                          label: 'Member Since',
-                          value: _formatDateTime(user!['createdAt']),
-                        ),
-                      if (user?['isEmailVerified'] != null)
-                        _buildVerificationStatus(
-                          context: context,
-                          isVerified: user!['isEmailVerified'] == true,
-                          label: 'Email Verification',
-                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      const SizedBox(height: 40),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ],
@@ -303,112 +722,100 @@ class ProfileDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(
-    String title,
-    IconData icon,
-    BuildContext context,
-  ) {
+  Widget _buildSectionHeader(String title, IconData icon) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? Colors.white.withOpacity(0.1)
-                  : Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+    
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppTheme.primaryColor.withOpacity(0.15),
+                AppTheme.accentColor.withOpacity(0.1),
+              ],
             ),
-            child: Icon(
-              icon,
-              color: isDarkMode ? Colors.white : Theme.of(context).primaryColor,
-              size: 20,
-            ),
+            borderRadius: BorderRadius.circular(12),
           ),
-          const SizedBox(width: 12),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailCard({
-    required BuildContext context,
-    required List<Widget> items,
-  }) {
-    if (items.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: List.generate(
-          items.length,
-          (index) => Column(
-            children: [
-              items[index],
-              if (index < items.length - 1)
-                Divider(
-                  height: 1,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white12
-                      : Colors.grey[200],
-                  indent: 16,
-                  endIndent: 16,
-                ),
-            ],
+          child: Icon(
+            icon,
+            color: AppTheme.primaryColor,
+            size: 22,
           ),
         ),
-      ),
+        const SizedBox(width: 14),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildDetailItem({
-    required BuildContext context,
+  Widget _buildEditableCard({required List<Widget> children}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode 
+                ? Colors.black.withOpacity(0.3) 
+                : Colors.black.withOpacity(0.06),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildDivider() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Divider(
+      height: 1,
+      color: isDarkMode ? Colors.white12 : Colors.grey.shade100,
+      indent: 70,
+    );
+  }
+
+  Widget _buildEditableField({
     required IconData icon,
     required String label,
-    required String value,
+    required TextEditingController controller,
+    bool enabled = true,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    String? hint,
+    String? Function(String?)? validator,
   }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isDarkMode
                   ? Colors.white.withOpacity(0.1)
-                  : Theme.of(context).primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+                  : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              color: isDarkMode
-                  ? Colors.white70
-                  : Theme.of(context).primaryColor,
-              size: 20,
+              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
+              size: 22,
             ),
           ),
           const SizedBox(width: 16),
@@ -418,22 +825,208 @@ class ProfileDetailsScreen extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                  style: TextStyle(
                     fontSize: 13,
-                    letterSpacing: 0.2,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: controller,
+                  enabled: enabled,
+                  keyboardType: keyboardType,
+                  maxLines: maxLines,
+                  validator: validator,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: hint ?? (enabled ? 'Enter $label' : ''),
+                    hintStyle: TextStyle(
+                      color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+                    ),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    filled: enabled,
+                    fillColor: enabled
+                        ? (isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50)
+                        : Colors.transparent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (enabled)
+            Icon(
+              Icons.edit_outlined,
+              size: 18,
+              color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool isLocked = false,
+  }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.white.withOpacity(0.1)
+                  : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  style: TextStyle(
+                    fontSize: 16,
                     fontWeight: FontWeight.w500,
                     color: isDarkMode ? Colors.white : AppTheme.textPrimary,
-                    fontSize: 15,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (isLocked)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock, size: 14, color: Colors.amber.shade700),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Verified',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderSelector() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final genders = ['Male', 'Female', 'Other'];
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.white.withOpacity(0.1)
+                  : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.transgender,
+              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Gender',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: genders.map((gender) {
+                    final isSelected = _selectedGender == gender;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedGender = gender),
+                        child: Container(
+                          margin: EdgeInsets.only(right: gender != genders.last ? 8 : 0),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            gradient: isSelected ? AppTheme.primaryGradient : null,
+                            color: isSelected
+                                ? null
+                                : isDarkMode
+                                    ? Colors.white.withOpacity(0.1)
+                                    : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isSelected
+                                ? null
+                                : Border.all(
+                                    color: isDarkMode ? Colors.white12 : Colors.grey.shade200,
+                                  ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              gender,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : isDarkMode
+                                        ? Colors.white70
+                                        : AppTheme.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -443,101 +1036,163 @@ class ProfileDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVerificationStatus({
-    required BuildContext context,
-    required bool isVerified,
-    required String label,
-  }) {
+  Widget _buildDateField() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
+    
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Verification status icon
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isDarkMode
-                  ? (isVerified
-                        ? Colors.green[900]!.withOpacity(0.3)
-                        : Colors.orange[900]!.withOpacity(0.3))
-                  : (isVerified ? Colors.green[50] : Colors.orange[50]),
-              borderRadius: BorderRadius.circular(8),
+                  ? Colors.white.withOpacity(0.1)
+                  : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              isVerified ? Icons.verified : Icons.warning_amber_rounded,
-              color: isVerified
-                  ? (isDarkMode ? Colors.green[300]! : Colors.green[600]!)
-                  : (isDarkMode ? Colors.orange[300]! : Colors.orange[600]!),
-              size: 20,
+              Icons.cake,
+              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
+              size: 22,
             ),
           ),
-
           const SizedBox(width: 16),
-
-          // Verification status text and actions
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Label
                 Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: isDarkMode ? Colors.white70 : AppTheme.textSecondary,
+                  'Date of Birth',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
-                // Status and resend button
-                Row(
-                  children: [
-                    // Status text
-                    Text(
-                      isVerified ? 'Verified' : 'Not Verified',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: isDarkMode
-                            ? (isVerified
-                                  ? Colors.green[300]!
-                                  : Colors.orange[300]!)
-                            : (isVerified
-                                  ? Colors.green[600]!
-                                  : Colors.orange[600]!),
-                        fontWeight: FontWeight.w500,
-                      ),
+                GestureDetector(
+                  onTap: () => _selectDate(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(10),
                     ),
-
-                    // Resend button (only shown if not verified)
-                    if (!isVerified) ...[
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          // TODO: Implement verification resend
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Verification email sent!'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Resend',
+                    child: Row(
+                      children: [
+                        Text(
+                          _selectedDob != null
+                              ? _formatDate(_selectedDob!)
+                              : 'Select date',
                           style: TextStyle(
-                            color: Theme.of(context).primaryColor,
+                            fontSize: 16,
                             fontWeight: FontWeight.w500,
-                            decoration: TextDecoration.underline,
+                            color: _selectedDob != null
+                                ? (isDarkMode ? Colors.white : AppTheme.textPrimary)
+                                : (isDarkMode ? Colors.white30 : Colors.grey.shade400),
                           ),
                         ),
-                      ),
-                    ],
-                  ],
+                        const Spacer(),
+                        Icon(
+                          Icons.calendar_month,
+                          color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPremiumStatus() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isPremium = _userData['isPremium'] == true;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isPremium
+                  ? Colors.amber.withOpacity(0.15)
+                  : isDarkMode
+                      ? Colors.white.withOpacity(0.1)
+                      : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.workspace_premium,
+              color: isPremium
+                  ? Colors.amber.shade700
+                  : isDarkMode
+                      ? Colors.white70
+                      : AppTheme.primaryColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Subscription',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isPremium ? 'Premium Member' : 'Free Plan',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isPremium
+                        ? Colors.amber.shade700
+                        : isDarkMode
+                            ? Colors.white
+                            : AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isPremium)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, size: 16, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'PRO',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -548,75 +1203,28 @@ class ProfileDetailsScreen extends StatelessWidget {
     return s[0].toUpperCase() + s.substring(1).toLowerCase();
   }
 
-  String _formatDate(dynamic date) {
-    try {
-      if (date == null) return 'Not specified';
-
-      DateTime dateTime;
-      if (date is String) {
-        dateTime = DateTime.parse(date);
-      } else if (date is DateTime) {
-        dateTime = date;
-      } else {
-        return 'Invalid date';
-      }
-
-      // Format: MMM d, yyyy (e.g., Oct 8, 2023)
-      final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      return '${months[dateTime.month - 1]} ${dateTime.day}, ${dateTime.year}';
-    } catch (e) {
-      return 'Invalid date';
-    }
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
   String _formatDateTime(dynamic dateTime) {
     try {
       if (dateTime == null) return 'Not available';
-
       DateTime dt;
       if (dateTime is String) {
         dt = DateTime.parse(dateTime);
       } else if (dateTime is DateTime) {
         dt = dateTime;
       } else {
-        return 'Invalid date';
+        return 'Not available';
       }
-
-      // Format: MMM d, yyyy at h:mm AM/PM
-      final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      final period = dt.hour < 12 ? 'AM' : 'PM';
-      var hour = dt.hour % 12;
-      if (hour == 0) hour = 12;
-
-      return '${months[dt.month - 1]} ${dt.day}, ${dt.year} at $hour:${dt.minute.toString().padLeft(2, '0')} $period';
-    } catch (e) {
-      return 'Invalid date';
+      return _formatDate(dt);
+    } catch (_) {
+      return 'Not available';
     }
   }
 }
