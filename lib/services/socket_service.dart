@@ -35,7 +35,19 @@ class SocketService {
     }
 
     try {
-      _socket = IO.io(serverUrl, <String, dynamic>{
+      // Normalize URL: socket_io_client uses Uri.port which is 0 when no port in URL,
+      // leading to invalid "host:0" and WebSocket 503. Use explicit port for https/http.
+      final uri = Uri.parse(serverUrl);
+      final String normalizedUrl;
+      if (uri.scheme == 'https') {
+        normalizedUrl = 'https://${uri.host}:443';
+      } else if (uri.scheme == 'http') {
+        normalizedUrl = 'http://${uri.host}:80';
+      } else {
+        normalizedUrl = serverUrl;
+      }
+
+      _socket = IO.io(normalizedUrl, <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': false,
       });

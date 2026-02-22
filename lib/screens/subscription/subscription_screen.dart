@@ -77,21 +77,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       // Create subscription
       print('📱 Creating subscription for user: $_userId');
       final result = await _subscriptionService.createSubscription(_userId!);
-      
+
       print('📱 Create subscription result: $result');
 
       if (result['success'] == true) {
         final razorpaySubscriptionId = result['subscriptionId'];
         final amount = result['amount'];
-        
+
         print('💳 Razorpay Subscription ID: $razorpaySubscriptionId');
         print('💳 Amount: $amount');
-        
-        if (razorpaySubscriptionId == null || razorpaySubscriptionId.isEmpty) {
+
+        if (razorpaySubscriptionId == null ||
+            razorpaySubscriptionId.isEmpty) {
           _showError('Invalid subscription ID received from server');
           return;
         }
-        
+
         // Open Razorpay checkout
         _subscriptionService.openCheckout(
           subscriptionId: razorpaySubscriptionId,
