@@ -60,6 +60,11 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _animationController.forward();
+    
+    // Debug: Print user role information
+    print('👤 ProfileDetailsScreen - User Role: ${_userData['role']}');
+    print('👤 ProfileDetailsScreen - Has teacherProfile: ${_userData['teacherProfile'] != null}');
+    print('👤 ProfileDetailsScreen - Has studentProfile: ${_userData['studentProfile'] != null}');
   }
 
   void _initControllers() {
@@ -124,7 +129,15 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     super.dispose();
   }
 
-  bool get _isTeacher => _userData['role']?.toString() == 'teacher';
+  bool get _isTeacher {
+    final role = _userData['role']?.toString().toLowerCase();
+    final hasTeacherProfile = _userData['teacherProfile'] != null;
+    
+    print('🔍 _isTeacher check: role=$role, hasTeacherProfile=$hasTeacherProfile');
+    
+    // Check if role is 'teacher' OR if they have a teacherProfile
+    return role == 'teacher' || hasTeacherProfile;
+  }
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
@@ -472,7 +485,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      _capitalizeFirst(_userData['role']?.toString() ?? 'User'),
+                                      _isTeacher ? 'Teacher' : 'Student',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w600,
