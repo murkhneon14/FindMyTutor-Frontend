@@ -78,8 +78,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     '10th Grade',
     '11th Grade',
     '12th Grade',
-    'College',
-    'University',
+    'BA',
+    'B.COM',
+    'B.Sc',
   ];
 
   @override

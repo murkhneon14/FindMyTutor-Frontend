@@ -128,6 +128,20 @@ class _ExploreScreenState extends State<ExploreScreen>
       tutorCount: 165,
       color: const Color(0xFFF97316),
     ),
+    Subject(
+      name: 'Music Lessons',
+      imageUrl:
+          'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=800',
+      tutorCount: 98,
+      color: const Color(0xFFE91E63),
+    ),
+    Subject(
+      name: 'Baking Lessons',
+      imageUrl:
+          'https://images.unsplash.com/photo-1556909212-d5b604d0c90d?w=800',
+      tutorCount: 76,
+      color: const Color(0xFF795548),
+    ),
   ];
 
   @override
@@ -1450,8 +1464,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                         '10th Grade',
                         '11th Grade',
                         '12th Grade',
-                        'College',
-                        'University',
+                        'BA',
+                        'B.COM',
+                        'B.Sc',
                       ];
 
                       return InkWell(
@@ -2765,6 +2780,10 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
         return Icons.account_balance_wallet_rounded;
       case 'economics':
         return Icons.trending_up_rounded;
+      case 'music lessons':
+        return Icons.music_note_rounded;
+      case 'baking lessons':
+        return Icons.cake_rounded;
       default:
         return Icons.school_rounded;
     }

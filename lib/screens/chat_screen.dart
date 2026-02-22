@@ -8,6 +8,7 @@ import '../services/chat_service.dart';
 import '../services/socket_service.dart';
 import '../services/global_notification_manager.dart';
 import '../config/api.dart';
+import '../utils/quick_replies.dart';
 
 class ChatScreen extends StatefulWidget {
   final String chatId;
@@ -250,6 +251,41 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Widget _buildQuickReplies() {
+    final replies = QuickReplies.getRepliesForRole(widget.otherUser.role);
+    if (replies.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: replies
+              .map(
+                (text) => Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    child: ActionChip(
+                      label: Text(
+                        text,
+                        style: const TextStyle(fontSize: 13),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onPressed: () =>
+                          _handleSendPressed(types.PartialText(text: text)),
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+
   void _handlePreviewDataFetched(
     types.TextMessage message,
     types.PreviewData previewData,
@@ -293,6 +329,7 @@ class _ChatScreenState extends State<ChatScreen> {
               user: _currentUser,
               showUserAvatars: true,
               showUserNames: false,
+              listBottomWidget: _buildQuickReplies(),
               theme: DefaultChatTheme(
                 backgroundColor: Colors.grey[100]!,
                 primaryColor: Theme.of(context).primaryColor,
