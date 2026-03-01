@@ -69,4 +69,9 @@ class ApiConfig {
   static String subscriptionStatus(String userId) =>
       '$baseUrl/api/subscription/status/$userId';
   static String get subscriptionCancel => '$baseUrl/api/subscription/cancel';
+
+  // Banner endpoints
+  static String get bannersNearby => '$baseUrl/api/banners/nearby';
+  static String bannerImpression(String id) => '$baseUrl/api/banners/$id/impression';
+  static String bannerClick(String id) => '$baseUrl/api/banners/$id/click';
 }

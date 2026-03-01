@@ -14,6 +14,7 @@ import '../../services/subscription_service.dart';
 import '../subscription/subscription_screen.dart';
 import 'notifications_bottom_sheet.dart';
 import '../../services/notification_storage_service.dart';
+import '../../services/banner_service.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -42,6 +43,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   String? _userRole; // Track user role (teacher/student)
   int _currentBannerPage = 0;
   int _unreadNotificationCount = 0;
+  List<Map<String, dynamic>> _liveBanners = [];
 
   final List<Subject> _subjects = [
     Subject(
@@ -158,7 +160,8 @@ class _ExploreScreenState extends State<ExploreScreen>
   void _startAutoScroll() {
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted && _bannerController.hasClients) {
-        final nextPage = (_currentBannerPage + 1) % 4;
+        final count = _liveBanners.isNotEmpty ? _liveBanners.length : 4;
+        final nextPage = (_currentBannerPage + 1) % count;
         _bannerController.animateToPage(
           nextPage,
           duration: const Duration(milliseconds: 500),
@@ -323,6 +326,8 @@ class _ExploreScreenState extends State<ExploreScreen>
         setState(() {
           _currentLocation = position;
         });
+        // Fetch nearby banners once we have location
+        _fetchNearbyBanners();
       }
     } catch (e) {
       print('Error getting location: $e');
@@ -330,6 +335,28 @@ class _ExploreScreenState extends State<ExploreScreen>
       if (mounted) {
         setState(() => _isLoadingLocation = false);
       }
+    }
+  }
+
+  Future<void> _fetchNearbyBanners() async {
+    if (_currentLocation == null) return;
+    try {
+      final banners = await BannerService.getNearbyBanners(
+        latitude: _currentLocation!.latitude,
+        longitude: _currentLocation!.longitude,
+      );
+      if (mounted && banners.isNotEmpty) {
+        setState(() {
+          _liveBanners = banners;
+        });
+        // Track impressions for all visible banners
+        for (final b in banners) {
+          final id = b['_id']?.toString();
+          if (id != null) BannerService.trackImpression(id);
+        }
+      }
+    } catch (e) {
+      print('Error fetching banners: $e');
     }
   }
 
@@ -1044,17 +1071,21 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Widget _buildPromoBanner() {
-    final List<String> bannerImages = [
+    // Use live banners from backend if available, otherwise fall back to local assets
+    final List<String> fallbackImages = [
       'assets/images/lekhi_tutorials_banner.jpg',
       'assets/images/lekhi_tutorials_banner1.jpg',
       'assets/images/lk1.jpg',
       'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=400&fit=crop',
     ];
 
+    final bool hasLiveBanners = _liveBanners.isNotEmpty;
+    final int bannerCount = hasLiveBanners ? _liveBanners.length : fallbackImages.length;
+
     return SizedBox(
       height: 200,
       child: PageView.builder(
-        itemCount: bannerImages.length,
+        itemCount: bannerCount,
         controller: _bannerController,
         onPageChanged: (index) {
           setState(() {
@@ -1062,69 +1093,90 @@ class _ExploreScreenState extends State<ExploreScreen>
           });
         },
         itemBuilder: (context, index) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryColor.withOpacity(0.2),
-                  blurRadius: 15,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: SizedBox(
-                height: 200,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Background Image
-                    bannerImages[index].startsWith('http')
-                        ? Image.network(
-                            bannerImages[index],
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                            height: 200,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildFallbackBanner();
-                            },
-                          )
-                        : Image.asset(
-                            bannerImages[index],
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                            height: 200,
-                            errorBuilder: (context, error, stackTrace) {
-                              return _buildFallbackBanner();
-                            },
-                          ),
-                    // Page Indicator
-                    Positioned(
-                      bottom: 12,
-                      left: 0,
-                      right: 0,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          bannerImages.length,
-                          (dotIndex) => Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _currentBannerPage == dotIndex ? 24 : 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: _currentBannerPage == dotIndex
-                                  ? Colors.white
-                                  : Colors.white.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(4),
+          return GestureDetector(
+            onTap: () {
+              if (hasLiveBanners) {
+                final banner = _liveBanners[index];
+                final id = banner['_id']?.toString();
+                final linkUrl = banner['linkUrl']?.toString() ?? '';
+                if (id != null) BannerService.trackClick(id);
+                // You can navigate to linkUrl here if needed
+              }
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  height: 200,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Banner image
+                      hasLiveBanners
+                          ? Image.network(
+                              _liveBanners[index]['imageUrl'] ?? '',
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              height: 200,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildFallbackBanner();
+                              },
+                            )
+                          : (fallbackImages[index].startsWith('http')
+                              ? Image.network(
+                                  fallbackImages[index],
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                  height: 200,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return _buildFallbackBanner();
+                                  },
+                                )
+                              : Image.asset(
+                                  fallbackImages[index],
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                  height: 200,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return _buildFallbackBanner();
+                                  },
+                                )),
+                      // Page Indicator
+                      Positioned(
+                        bottom: 12,
+                        left: 0,
+                        right: 0,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            bannerCount,
+                            (dotIndex) => Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              width: _currentBannerPage == dotIndex ? 24 : 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _currentBannerPage == dotIndex
+                                    ? Colors.white
+                                    : Colors.white.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
