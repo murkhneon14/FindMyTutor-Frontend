@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://fmt-backend-1yn7.onrender.com',
+    defaultValue: 'https://fmt-backend-new.onrender.com',
   );
 
   // ==========================================
@@ -72,6 +72,7 @@ class ApiConfig {
 
   // Banner endpoints
   static String get bannersNearby => '$baseUrl/api/banners/nearby';
-  static String bannerImpression(String id) => '$baseUrl/api/banners/$id/impression';
+  static String bannerImpression(String id) =>
+      '$baseUrl/api/banners/$id/impression';
   static String bannerClick(String id) => '$baseUrl/api/banners/$id/click';
 }

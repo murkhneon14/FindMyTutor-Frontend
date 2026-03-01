@@ -159,8 +159,8 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   void _startAutoScroll() {
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && _bannerController.hasClients) {
-        final count = _liveBanners.isNotEmpty ? _liveBanners.length : 4;
+      if (mounted && _bannerController.hasClients && _liveBanners.isNotEmpty) {
+        final count = _liveBanners.length;
         final nextPage = (_currentBannerPage + 1) % count;
         _bannerController.animateToPage(
           nextPage,
@@ -339,24 +339,36 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Future<void> _fetchNearbyBanners() async {
-    if (_currentLocation == null) return;
+    print('🔄 _fetchNearbyBanners called');
+    print('🔄 _currentLocation: $_currentLocation');
+    if (_currentLocation == null) {
+      print('⚠️ _currentLocation is null — skipping banner fetch');
+      return;
+    }
+    print('📍 Fetching banners for lat=${_currentLocation!.latitude}, lng=${_currentLocation!.longitude}');
     try {
       final banners = await BannerService.getNearbyBanners(
         latitude: _currentLocation!.latitude,
         longitude: _currentLocation!.longitude,
       );
+      print('📦 Received ${banners.length} banners from BannerService');
       if (mounted && banners.isNotEmpty) {
         setState(() {
           _liveBanners = banners;
         });
+        print('✅ _liveBanners updated with ${_liveBanners.length} banners');
+        // Restart auto-scroll now that we have banners
+        _startAutoScroll();
         // Track impressions for all visible banners
         for (final b in banners) {
           final id = b['_id']?.toString();
           if (id != null) BannerService.trackImpression(id);
         }
+      } else {
+        print('⚠️ No banners returned or widget not mounted. mounted=$mounted, banners.length=${banners.length}');
       }
     } catch (e) {
-      print('Error fetching banners: $e');
+      print('❌ Error fetching banners: $e');
     }
   }
 
@@ -1071,16 +1083,70 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Widget _buildPromoBanner() {
-    // Use live banners from backend if available, otherwise fall back to local assets
-    final List<String> fallbackImages = [
-      'assets/images/lekhi_tutorials_banner.jpg',
-      'assets/images/lekhi_tutorials_banner1.jpg',
-      'assets/images/lk1.jpg',
-      'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1200&h=400&fit=crop',
-    ];
+    // Only show location-based ads from backend
+    if (_liveBanners.isEmpty) {
+      // Show a compact placeholder when no location-based ads are available
+      return Container(
+        height: 120,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.primaryColor.withOpacity(0.08),
+              AppTheme.primaryColor.withOpacity(0.15),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppTheme.primaryColor.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+        child: InkWell(
+          onTap: _currentLocation == null ? _getCurrentLocation : null,
+          borderRadius: BorderRadius.circular(20),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _currentLocation == null
+                      ? Icons.location_off_rounded
+                      : Icons.campaign_rounded,
+                  color: AppTheme.primaryColor.withOpacity(0.5),
+                  size: 32,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _currentLocation == null
+                      ? 'Enable location to see nearby ads'
+                      : 'No ads available in your area',
+                  style: TextStyle(
+                    color: AppTheme.primaryColor.withOpacity(0.6),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (_currentLocation == null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to enable',
+                    style: TextStyle(
+                      color: AppTheme.primaryColor.withOpacity(0.4),
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
-    final bool hasLiveBanners = _liveBanners.isNotEmpty;
-    final int bannerCount = hasLiveBanners ? _liveBanners.length : fallbackImages.length;
+    final int bannerCount = _liveBanners.length;
 
     return SizedBox(
       height: 200,
@@ -1095,13 +1161,11 @@ class _ExploreScreenState extends State<ExploreScreen>
         itemBuilder: (context, index) {
           return GestureDetector(
             onTap: () {
-              if (hasLiveBanners) {
-                final banner = _liveBanners[index];
-                final id = banner['_id']?.toString();
-                final linkUrl = banner['linkUrl']?.toString() ?? '';
-                if (id != null) BannerService.trackClick(id);
-                // You can navigate to linkUrl here if needed
-              }
+              final banner = _liveBanners[index];
+              final id = banner['_id']?.toString();
+              final linkUrl = banner['linkUrl']?.toString() ?? '';
+              if (id != null) BannerService.trackClick(id);
+              // You can navigate to linkUrl here if needed
             },
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),
@@ -1122,59 +1186,40 @@ class _ExploreScreenState extends State<ExploreScreen>
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Banner image
-                      hasLiveBanners
-                          ? Image.network(
-                              _liveBanners[index]['imageUrl'] ?? '',
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: 200,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildFallbackBanner();
-                              },
-                            )
-                          : (fallbackImages[index].startsWith('http')
-                              ? Image.network(
-                                  fallbackImages[index],
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                  height: 200,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildFallbackBanner();
-                                  },
-                                )
-                              : Image.asset(
-                                  fallbackImages[index],
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                  height: 200,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return _buildFallbackBanner();
-                                  },
-                                )),
-                      // Page Indicator
-                      Positioned(
-                        bottom: 12,
-                        left: 0,
-                        right: 0,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            bannerCount,
-                            (dotIndex) => Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              width: _currentBannerPage == dotIndex ? 24 : 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: _currentBannerPage == dotIndex
-                                    ? Colors.white
-                                    : Colors.white.withOpacity(0.5),
-                                borderRadius: BorderRadius.circular(4),
+                      // Banner image from backend
+                      Image.network(
+                        _liveBanners[index]['imageUrl'] ?? '',
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 200,
+                        errorBuilder: (context, error, stackTrace) {
+                          return _buildFallbackBanner();
+                        },
+                      ),
+                      // Page Indicator (only show if more than 1 banner)
+                      if (bannerCount > 1)
+                        Positioned(
+                          bottom: 12,
+                          left: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              bannerCount,
+                              (dotIndex) => Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                width: _currentBannerPage == dotIndex ? 24 : 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: _currentBannerPage == dotIndex
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
