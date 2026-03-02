@@ -860,10 +860,9 @@ class _AccountScreenState extends State<AccountScreen> {
                 gradient: AppTheme.primaryGradient,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'Premium Plan',
                     style: TextStyle(
                       color: Colors.white,
@@ -871,12 +870,13 @@ class _AccountScreenState extends State<AccountScreen> {
                       fontSize: 16,
                     ),
                   ),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
                     '₹49/month',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 22,
                     ),
                   ),
                 ],
