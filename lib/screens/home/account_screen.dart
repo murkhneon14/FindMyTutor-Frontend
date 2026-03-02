@@ -964,112 +964,121 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         title: Row(
           children: [
-            Icon(Icons.school_rounded, color: AppTheme.primaryColor, size: 32),
+            Icon(Icons.school_rounded, color: AppTheme.primaryColor, size: 28),
             const SizedBox(width: 8),
-            const Text('About FindMyTutor'),
+            const Flexible(
+              child: Text(
+                'About FindMyTutor',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // About Us
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'About Us',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primaryColor,
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // About Us
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'About Us',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Find My Tutor is a reliable learning platform designed to connect students and parents with qualified academic tutors and skill-based mentors. From academic subjects to specialized skills like music, baking, and more, learners can easily find and connect with the right educators based on their needs.',
-                style: TextStyle(fontSize: 14, height: 1.5),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '"Discover the Mentor Within Your Reach"',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.primaryColor,
-                  height: 1.5,
+                const SizedBox(height: 10),
+                const Text(
+                  'Find My Tutor is a reliable learning platform designed to connect students and parents with qualified academic tutors and skill-based mentors. From academic subjects to specialized skills like music, baking, and more, learners can easily find and connect with the right educators based on their needs.',
+                  style: TextStyle(fontSize: 13, height: 1.5),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'We make it easier for learners to access trusted guidance and begin their learning journey with confidence.',
-                style: TextStyle(fontSize: 14, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-              // Our Mission
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Our Mission',
+                const SizedBox(height: 8),
+                Text(
+                  '"Discover the Mentor Within Your Reach"',
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w600,
                     color: AppTheme.primaryColor,
+                    height: 1.5,
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'To provide reliable and accessible tutoring services while empowering educators to inspire, guide, and support student success.',
-                style: TextStyle(fontSize: 14, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-              // Our Vision
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 6),
+                const Text(
+                  'We make it easier for learners to access trusted guidance and begin their learning journey with confidence.',
+                  style: TextStyle(fontSize: 13, height: 1.5),
                 ),
-                child: Text(
-                  'Our Vision',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.primaryColor,
+                const SizedBox(height: 16),
+                // Our Mission
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Our Mission',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryColor,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'To become a trusted educational network that connects learners and educators, strengthening communities through accessible and quality education.',
-                style: TextStyle(fontSize: 14, height: 1.5),
-              ),
-              const SizedBox(height: 20),
-              const Divider(),
-              const SizedBox(height: 8),
-              const Text(
-                'Version: 1.0.0',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                '© 2025 FindMyTutor. All rights reserved.',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-              ),
-            ],
+                const SizedBox(height: 10),
+                const Text(
+                  'To provide reliable and accessible tutoring services while empowering educators to inspire, guide, and support student success.',
+                  style: TextStyle(fontSize: 13, height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                // Our Vision
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Our Vision',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'To become a trusted educational network that connects learners and educators, strengthening communities through accessible and quality education.',
+                  style: TextStyle(fontSize: 13, height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Version: 1.0.0',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '© 2025 FindMyTutor. All rights reserved.',
+                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
