@@ -27,7 +27,7 @@ class FAQScreen extends StatelessWidget {
           _buildFAQItem(
             context,
             'Is FindMyTutor free to use?',
-            'Yes! Basic features are completely free. You can search for tutors, message them, and book sessions at no cost. Premium features offer additional benefits.',
+            'You can search for tutors and view their profiles for free. However, messaging tutors and booking sessions require a premium subscription. Subscribe to unlock all features and connect with the best tutors near you!',
           ),
           _buildFAQItem(
             context,

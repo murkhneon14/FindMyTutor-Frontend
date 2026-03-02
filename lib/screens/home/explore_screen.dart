@@ -1148,8 +1148,8 @@ class _ExploreScreenState extends State<ExploreScreen>
 
     final int bannerCount = _liveBanners.length;
 
-    return SizedBox(
-      height: 200,
+    return AspectRatio(
+      aspectRatio: 16 / 6, // Responsive banner aspect ratio
       child: PageView.builder(
         itemCount: bannerCount,
         controller: _bannerController,
@@ -1170,6 +1170,9 @@ class _ExploreScreenState extends State<ExploreScreen>
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey[900]
+                    : Colors.grey[100],
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -1181,52 +1184,57 @@ class _ExploreScreenState extends State<ExploreScreen>
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: SizedBox(
-                  height: 200,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Banner image from backend
-                      Image.network(
-                        _liveBanners[index]['imageUrl'] ?? '',
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                        height: 200,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildFallbackBanner();
-                        },
+                child: Image.network(
+                  _liveBanners[index]['imageUrl'] ?? '',
+                  fit: BoxFit.fill,
+                  width: double.infinity,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                        color: AppTheme.primaryColor,
+                        strokeWidth: 2,
                       ),
-                      // Page Indicator (only show if more than 1 banner)
-                      if (bannerCount > 1)
-                        Positioned(
-                          bottom: 12,
-                          left: 0,
-                          right: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(
-                              bannerCount,
-                              (dotIndex) => Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 4),
-                                width: _currentBannerPage == dotIndex ? 24 : 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: _currentBannerPage == dotIndex
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(0.5),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return _buildFallbackBanner();
+                  },
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+
+    // Page indicator shown below the banner
+  }
+
+  Widget _buildBannerIndicator(int bannerCount) {
+    if (bannerCount <= 1) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          bannerCount,
+          (dotIndex) => Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            width: _currentBannerPage == dotIndex ? 24 : 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: _currentBannerPage == dotIndex
+                  ? AppTheme.primaryColor
+                  : AppTheme.primaryColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
       ),
     );
   }
