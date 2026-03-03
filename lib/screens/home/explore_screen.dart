@@ -15,6 +15,7 @@ import '../subscription/subscription_screen.dart';
 import 'notifications_bottom_sheet.dart';
 import '../../services/notification_storage_service.dart';
 import '../../services/banner_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -1160,12 +1161,17 @@ class _ExploreScreenState extends State<ExploreScreen>
         },
         itemBuilder: (context, index) {
           return GestureDetector(
-            onTap: () {
+            onTap: () async {
               final banner = _liveBanners[index];
               final id = banner['_id']?.toString();
               final linkUrl = banner['linkUrl']?.toString() ?? '';
               if (id != null) BannerService.trackClick(id);
-              // You can navigate to linkUrl here if needed
+              if (linkUrl.isNotEmpty) {
+                final uri = Uri.parse(linkUrl);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              }
             },
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 10),

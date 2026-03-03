@@ -96,7 +96,7 @@ class SubscriptionService {
     print('💳 Name: $userName');
 
     var options = {
-      'key': 'rzp_test_SJ6tWDgkN7RRiB', // Razorpay test key
+      'key': 'rzp_live_S83G1NzSLG3V4g', 
       'subscription_id': subscriptionId,
       'amount': amount,
       'currency': 'INR',

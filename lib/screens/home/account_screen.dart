@@ -1002,7 +1002,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Find My Tutor is a reliable learning platform designed to connect students and parents with qualified academic tutors and skill-based mentors. From academic subjects to specialized skills like music, baking, and more, learners can easily find and connect with the right educators based on their needs.',
+                  'Find My Tutor is a reliable Educational platform designed to connect students and parents with qualified academic tutors and skill-based mentors. From academic subjects to specialized skills like music, baking, and more, learners can easily find and connect with the right educators based on their needs.',
                   style: TextStyle(fontSize: 13, height: 1.5),
                 ),
                 const SizedBox(height: 8),
