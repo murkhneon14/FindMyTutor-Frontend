@@ -724,8 +724,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                 if (value == null || value.isEmpty) {
                                   return 'Please write a short bio';
                                 }
-                                if (value.length < 30) {
-                                  return 'Please write at least 30 characters';
+                                if (value.length < 10) {
+                                  return 'Please write at least 10 characters';
                                 }
                                 return null;
                               },
