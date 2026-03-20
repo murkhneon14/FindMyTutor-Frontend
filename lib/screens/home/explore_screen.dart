@@ -413,12 +413,10 @@ class _ExploreScreenState extends State<ExploreScreen>
         'radius': _searchRadius,
         if (_selectedSubjects.isNotEmpty)
           'subjects': _selectedSubjects, // Send array of subjects
-        if (_selectedPreferredClasses.isNotEmpty)
-          'preferredClasses':
-              _selectedPreferredClasses, // Send array of preferred classes
+        // Note: preferredClasses filtering is done client-side after fetching
         if (_selectedGender != null) 'gender': _selectedGender, // Gender filter
         'page': 1,
-        'limit': 20,
+        'limit': 50, // Fetch more results for client-side class filtering
       };
 
       print('🔍 ========== SEARCH NEARBY TEACHERS ==========');
@@ -464,9 +462,33 @@ class _ExploreScreenState extends State<ExploreScreen>
         final tutors = responseData['tutors'] ?? [];
         print('✅ Found ${tutors.length} teachers');
 
-        // Apply client-side gender filter if selected (as fallback)
+        // Apply client-side filters as fallback (in case backend doesn't filter)
         List<Map<String, dynamic>> filteredTutors =
             List<Map<String, dynamic>>.from(tutors);
+
+        // Client-side class/preferred-class filter
+        if (_selectedPreferredClasses.isNotEmpty) {
+          filteredTutors = filteredTutors.where((t) {
+            final teacherClasses = (t['preferredClasses'] as List?)
+                    ?.map((e) => e.toString().toLowerCase())
+                    .toList() ??
+                const [];
+            // Match if teacher has any of the selected classes
+            // Use flexible matching to handle format differences
+            // e.g. '1st Grade' vs '1st', 'BA' vs 'Bachelor\'s'
+            return _selectedPreferredClasses.any((selected) {
+              final sel = selected.toLowerCase();
+              return teacherClasses.any((tc) =>
+                  tc == sel ||
+                  tc.contains(sel) ||
+                  sel.contains(tc) ||
+                  tc.startsWith(sel.replaceAll(' grade', '')) ||
+                  sel.startsWith(tc.replaceAll(' grade', '')));
+            });
+          }).toList();
+        }
+
+        // Client-side gender filter
         if (_selectedGender != null && _userRole != 'teacher') {
           filteredTutors = filteredTutors.where((t) {
             final teacherGender = (t['userId']?['gender'] ?? t['gender'])
@@ -570,11 +592,9 @@ class _ExploreScreenState extends State<ExploreScreen>
         'latitude': _currentLocation!.latitude,
         'longitude': _currentLocation!.longitude,
         'radius': _searchRadius,
-        if (_selectedPreferredClasses.isNotEmpty)
-          'classGrades':
-              _selectedPreferredClasses, // Send array of class grades
+        // Note: classGrades filtering is done client-side after fetching
         'page': 1,
-        'limit': 20,
+        'limit': 50, // Fetch more results for client-side class filtering
       };
 
       print('🔍 ========== SEARCH NEARBY STUDENTS ==========');
@@ -620,11 +640,31 @@ class _ExploreScreenState extends State<ExploreScreen>
         final students = responseData['students'] ?? [];
         print('✅ Found ${students.length} students');
 
+        // Apply client-side class/grade filter as fallback
+        List<Map<String, dynamic>> filteredStudents =
+            List<Map<String, dynamic>>.from(students);
+        if (_selectedPreferredClasses.isNotEmpty) {
+          filteredStudents = filteredStudents.where((s) {
+            final studentClass =
+                (s['classGrade'] ?? s['class'])?.toString().toLowerCase() ?? '';
+            // Use flexible matching to handle format differences
+            // e.g. filter '1st Grade' should match stored '1st' and vice versa
+            return _selectedPreferredClasses.any((selected) {
+              final sel = selected.toLowerCase();
+              return studentClass == sel ||
+                  studentClass.contains(sel) ||
+                  sel.contains(studentClass) ||
+                  studentClass.startsWith(sel.replaceAll(' grade', '')) ||
+                  sel.startsWith(studentClass.replaceAll(' grade', ''));
+            });
+          }).toList();
+        }
+
         setState(() {
-          _searchResults = List<Map<String, dynamic>>.from(students);
+          _searchResults = filteredStudents;
         });
 
-        if (students.isEmpty && mounted) {
+        if (filteredStudents.isEmpty && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('No students found in this area'),
@@ -1827,46 +1867,75 @@ class _ExploreScreenState extends State<ExploreScreen>
               const SizedBox(height: 24),
 
               // Search Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSearching
-                      ? null
-                      : (_userRole == 'teacher'
-                            ? _searchNearbyStudents
-                            : _searchNearbyTeachers),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: AppTheme.primaryColor.withOpacity(
-                      0.5,
-                    ),
-                  ),
-                  child: _isSearching
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+              Builder(
+                builder: (context) {
+                  // Check if at least one filter is selected
+                  final bool hasFilters = _userRole == 'teacher'
+                      ? _selectedPreferredClasses.isNotEmpty
+                      : (_selectedSubjects.isNotEmpty ||
+                          _selectedPreferredClasses.isNotEmpty ||
+                          _selectedGender != null);
+
+                  return Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: (_isSearching || !hasFilters)
+                              ? null
+                              : (_userRole == 'teacher'
+                                    ? _searchNearbyStudents
+                                    : _searchNearbyTeachers),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: AppTheme.primaryColor.withOpacity(
+                              0.5,
                             ),
                           ),
-                        )
-                      : Text(
-                          _userRole == 'teacher'
-                              ? 'Search Students'
-                              : 'Search Teachers',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                          child: _isSearching
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  _userRole == 'teacher'
+                                      ? 'Search Students'
+                                      : 'Search Teachers',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      if (!hasFilters)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            _userRole == 'teacher'
+                                ? 'Please select at least one class/grade filter'
+                                : 'Please select at least one filter (subject, class, or gender)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode ? Colors.white54 : Colors.grey[600],
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 20),
 
