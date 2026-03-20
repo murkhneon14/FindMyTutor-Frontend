@@ -5,11 +5,17 @@ class ApiConfig {
   );
 
   // ==========================================
-  // Firebase Phone Auth endpoints (NEW)
+  // Message Central OTP Auth endpoints
   // ==========================================
 
-  /// Main authentication endpoint - handles both login and registration
-  static String get authenticate => '$baseUrl/api/auth/authenticate';
+  /// Send OTP to phone number via Message Central
+  static String get sendOtp => '$baseUrl/api/auth/send-otp';
+
+  /// Verify OTP and authenticate (login or register)
+  static String get verifyOtp => '$baseUrl/api/auth/verify-otp';
+
+  /// Complete registration for new users after OTP verification
+  static String get completeRegistration => '$baseUrl/api/auth/complete-registration';
 
   /// Check if phone number is already registered
   static String get checkPhone => '$baseUrl/api/auth/check-phone';
@@ -24,8 +30,8 @@ class ApiConfig {
   // Legacy Auth endpoints (DEPRECATED)
   // ==========================================
 
+  static String get authenticate => '$baseUrl/api/auth/authenticate';
   static String get register => '$baseUrl/api/auth/register';
-  static String get verifyOtp => '$baseUrl/api/auth/verify-otp';
   static String get login => '$baseUrl/api/auth/login';
 
   // ==========================================

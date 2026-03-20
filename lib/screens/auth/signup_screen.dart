@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../config/theme.dart';
 import 'signup_step2_screen.dart';
-import '../../services/firebase_auth_service.dart';
+import '../../services/auth_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -22,7 +21,6 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading = false;
   bool _otpSent = false;
   String? _verificationId;
-  int? _resendToken;
   
   // OTP controllers
   final List<TextEditingController> _otpControllers = List.generate(6, (index) => TextEditingController());
@@ -32,7 +30,7 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _canResend = false;
   bool _isResending = false;
 
-  final FirebaseAuthService _authService = FirebaseAuthService();
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
@@ -74,41 +72,33 @@ class _SignupScreenState extends State<SignupScreen> {
 
     final phone = _phoneController.text.trim();
 
-    await _authService.sendOTP(
-      phoneNumber: phone,
-      forceResendingToken: _resendToken,
-      onCodeSent: (verificationId, resendToken) {
-        setState(() {
-          _isLoading = false;
-          _otpSent = true;
-          _verificationId = verificationId;
-          _resendToken = resendToken;
-        });
-        _startResendCountdown();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP sent to your phone number'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-        }
-      },
-      onError: (error) {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error)),
-          );
-        }
-      },
-      onAutoVerified: (credential) async {
-        // Auto verification (Android only)
-        setState(() => _isLoading = true);
-        await _handleCredential(credential);
-      },
-    );
+    // Send OTP via backend (Message Central)
+    final result = await _authService.sendOTP(phoneNumber: phone);
+
+    setState(() => _isLoading = false);
+
+    if (result['success'] == true) {
+      setState(() {
+        _otpSent = true;
+        _verificationId = result['verificationId'] as String?;
+      });
+      _startResendCountdown();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP sent to your phone number'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to send OTP')),
+        );
+      }
+    }
   }
 
   Future<void> _resendOTP() async {
@@ -116,44 +106,38 @@ class _SignupScreenState extends State<SignupScreen> {
 
     setState(() => _isResending = true);
 
-    await _authService.sendOTP(
+    final result = await _authService.sendOTP(
       phoneNumber: _phoneController.text.trim(),
-      forceResendingToken: _resendToken,
-      onCodeSent: (verificationId, resendToken) {
-        setState(() {
-          _isResending = false;
-          _verificationId = verificationId;
-          _resendToken = resendToken;
-        });
-        _startResendCountdown();
-        
-        // Clear OTP fields
-        for (var controller in _otpControllers) {
-          controller.clear();
-        }
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP resent to your phone number'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-        }
-      },
-      onError: (error) {
-        setState(() => _isResending = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error)),
-          );
-        }
-      },
-      onAutoVerified: (credential) async {
-        setState(() => _isResending = false);
-        await _handleCredential(credential);
-      },
     );
+
+    setState(() => _isResending = false);
+
+    if (result['success'] == true) {
+      setState(() {
+        _verificationId = result['verificationId'] as String?;
+      });
+      _startResendCountdown();
+      
+      // Clear OTP fields
+      for (var controller in _otpControllers) {
+        controller.clear();
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP resent to your phone number'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to resend OTP')),
+        );
+      }
+    }
   }
 
   Future<void> _verifyOTP() async {
@@ -170,53 +154,15 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     final otp = _otpControllers.map((c) => c.text).join();
+    final phone = _phoneController.text.trim();
+    final name = _nameController.text.trim();
 
-    final result = await _authService.verifyOTP(
+    // Verify OTP and register with backend
+    final result = await _authService.verifyOTPAndAuthenticate(
       otp: otp,
+      phone: phone,
       verificationId: _verificationId,
-    );
-
-    if (!mounted) return;
-
-    if (result['success'] == true) {
-      final user = result['user'] as User;
-      await _authenticateAndProceed(user);
-    } else {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Verification failed')),
-      );
-    }
-  }
-
-  Future<void> _handleCredential(PhoneAuthCredential credential) async {
-    try {
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      if (userCredential.user != null) {
-        await _authenticateAndProceed(userCredential.user!);
-      } else {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Verification failed')),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _authenticateAndProceed(User firebaseUser) async {
-    // Authenticate with backend
-    final result = await _authService.authenticateWithBackend(
-      firebaseUser: firebaseUser,
-      name: _nameController.text.trim(),
+      name: name,
       role: _userType,
     );
 
@@ -224,32 +170,35 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
-      // Navigate to Step 2 for profile completion
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SignupStep2Screen(
-            name: _nameController.text.trim(),
-            phone: _phoneController.text.trim(),
-            userType: _userType,
+      if (result['requiresProfile'] == true) {
+        // OTP verified but needs complete registration
+        // This shouldn't happen since we send name & role, but handle gracefully
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SignupStep2Screen(
+              name: name,
+              phone: phone,
+              userType: _userType,
+            ),
           ),
-        ),
-      );
-    } else if (result['requiresProfile'] == true) {
-      // New user needs to complete profile - same flow
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => SignupStep2Screen(
-            name: _nameController.text.trim(),
-            phone: _phoneController.text.trim(),
-            userType: _userType,
+        );
+      } else {
+        // Registration + auth successful, navigate to Step 2 for profile completion
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SignupStep2Screen(
+              name: name,
+              phone: phone,
+              userType: _userType,
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Authentication failed')),
+        SnackBar(content: Text(result['error'] ?? 'Verification failed')),
       );
     }
   }

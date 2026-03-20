@@ -12,6 +12,7 @@ import 'faq_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_screen.dart';
 import '../subscription/subscription_screen.dart';
+import '../../services/auth_service.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -427,7 +428,8 @@ class _AccountScreenState extends State<AccountScreen> {
               width: double.infinity,
               height: 56,
               child: OutlinedButton(
-                onPressed: () {
+                onPressed: () async {
+                  await AuthService().signOut();
                   setState(() {
                     _isLoggedIn = false;
                   });

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../config/theme.dart';
-import '../../services/firebase_auth_service.dart';
+import '../../services/auth_service.dart';
 import '../home/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,7 +19,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _otpSent = false;
   String? _verificationId;
-  int? _resendToken;
   
   // OTP controllers
   final List<TextEditingController> _otpControllers = List.generate(6, (index) => TextEditingController());
@@ -30,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _canResend = false;
   bool _isResending = false;
 
-  final FirebaseAuthService _authService = FirebaseAuthService();
+  final AuthService _authService = AuthService();
 
   @override
   void dispose() {
@@ -87,40 +85,33 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    await _authService.sendOTP(
-      phoneNumber: phone,
-      forceResendingToken: _resendToken,
-      onCodeSent: (verificationId, resendToken) {
-        setState(() {
-          _isLoading = false;
-          _otpSent = true;
-          _verificationId = verificationId;
-          _resendToken = resendToken;
-        });
-        _startResendCountdown();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP sent to your phone number'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-        }
-      },
-      onError: (error) {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error)),
-          );
-        }
-      },
-      onAutoVerified: (credential) async {
-        setState(() => _isLoading = true);
-        await _handleCredential(credential);
-      },
-    );
+    // Send OTP via backend (Message Central)
+    final result = await _authService.sendOTP(phoneNumber: phone);
+
+    setState(() => _isLoading = false);
+
+    if (result['success'] == true) {
+      setState(() {
+        _otpSent = true;
+        _verificationId = result['verificationId'] as String?;
+      });
+      _startResendCountdown();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP sent to your phone number'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to send OTP')),
+        );
+      }
+    }
   }
 
   Future<void> _resendOTP() async {
@@ -128,43 +119,38 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isResending = true);
 
-    await _authService.sendOTP(
+    final result = await _authService.sendOTP(
       phoneNumber: _phoneController.text.trim(),
-      forceResendingToken: _resendToken,
-      onCodeSent: (verificationId, resendToken) {
-        setState(() {
-          _isResending = false;
-          _verificationId = verificationId;
-          _resendToken = resendToken;
-        });
-        _startResendCountdown();
-        
-        for (var controller in _otpControllers) {
-          controller.clear();
-        }
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('OTP resent to your phone number'),
-              backgroundColor: AppTheme.successColor,
-            ),
-          );
-        }
-      },
-      onError: (error) {
-        setState(() => _isResending = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error)),
-          );
-        }
-      },
-      onAutoVerified: (credential) async {
-        setState(() => _isResending = false);
-        await _handleCredential(credential);
-      },
     );
+
+    setState(() => _isResending = false);
+
+    if (result['success'] == true) {
+      setState(() {
+        _verificationId = result['verificationId'] as String?;
+      });
+      _startResendCountdown();
+      
+      // Clear OTP fields
+      for (var controller in _otpControllers) {
+        controller.clear();
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP resent to your phone number'),
+            backgroundColor: AppTheme.successColor,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['error'] ?? 'Failed to resend OTP')),
+        );
+      }
+    }
   }
 
   Future<void> _verifyOTP() async {
@@ -180,52 +166,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     final otp = _otpControllers.map((c) => c.text).join();
+    final phone = _phoneController.text.trim();
 
-    final result = await _authService.verifyOTP(
+    final result = await _authService.verifyOTPAndAuthenticate(
       otp: otp,
+      phone: phone,
       verificationId: _verificationId,
-    );
-
-    if (!mounted) return;
-
-    if (result['success'] == true) {
-      final user = result['user'] as User;
-      await _authenticateAndLogin(user);
-    } else {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Verification failed')),
-      );
-    }
-  }
-
-  Future<void> _handleCredential(PhoneAuthCredential credential) async {
-    try {
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      if (userCredential.user != null) {
-        await _authenticateAndLogin(userCredential.user!);
-      } else {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Verification failed')),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _authenticateAndLogin(User firebaseUser) async {
-    // Authenticate with backend
-    final result = await _authService.authenticateWithBackend(
-      firebaseUser: firebaseUser,
     );
 
     if (!mounted) return;
@@ -247,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['error'] ?? 'Login failed')),
+        SnackBar(content: Text(result['error'] ?? 'Verification failed')),
       );
     }
   }
