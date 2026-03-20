@@ -21,8 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _verificationId;
   
   // OTP controllers
-  final List<TextEditingController> _otpControllers = List.generate(6, (index) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
+  final List<TextEditingController> _otpControllers = List.generate(4, (index) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(4, (index) => FocusNode());
   
   int _resendCountdown = 0;
   bool _canResend = false;
@@ -200,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onOTPChange(String value, int index) {
     if (value.isNotEmpty) {
-      if (index < 5) {
+      if (index < 3) {
         _focusNodes[index + 1].requestFocus();
       } else {
         _focusNodes[index].unfocus();
@@ -272,7 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 8),
               Text(
                 _otpSent 
-                    ? 'Enter the 6-digit code sent to +91 ${_phoneController.text}'
+                    ? 'Enter the 4-digit code sent to +91 ${_phoneController.text}'
                     : 'Login with your phone number',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: AppTheme.textSecondary,
@@ -428,9 +428,9 @@ class _LoginScreenState extends State<LoginScreen> {
         // OTP Input Fields
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(6, (index) {
+          children: List.generate(4, (index) {
             return SizedBox(
-              width: 50,
+              width: 60,
               child: KeyboardListener(
                 focusNode: FocusNode(),
                 onKeyEvent: (event) => _onOTPKeyPress(event, index),
