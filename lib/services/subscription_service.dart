@@ -96,7 +96,7 @@ class SubscriptionService {
     print('💳 Name: $userName');
 
     var options = {
-      'key': 'rzp_live_STA2SbndC8Cwno', 
+      'key': 'rzp_live_SVq0xKONWPidTi', 
       'subscription_id': subscriptionId,
       'amount': amount,
       'currency': 'INR',

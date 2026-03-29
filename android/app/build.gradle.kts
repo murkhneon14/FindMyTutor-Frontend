@@ -11,9 +11,7 @@ plugins {
 android {
     namespace = "com.findmytutor.app"
     compileSdk = flutter.compileSdkVersion
-    // Pin a known-good NDK to avoid strip tool mismatches during release builds
     ndkVersion = "27.0.12077973"
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -92,7 +90,12 @@ android {
         }
     }
 
-    // Let Gradle/NDK strip symbols normally.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols.add("**/*.so")
+        }
+    }
 }
 
 flutter {

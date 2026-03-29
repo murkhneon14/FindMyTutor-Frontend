@@ -20,7 +20,7 @@ class ApiConfig {
   /// Check if phone number is already registered
   static String get checkPhone => '$baseUrl/api/auth/check-phone';
 
-  /// Update user profile (name)
+  /// Update user profile (name)    
   static String get updateProfile => '$baseUrl/api/auth/update-profile';
 
   /// Update user email (optional)

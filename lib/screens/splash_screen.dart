@@ -62,19 +62,9 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.school_rounded,
-                size: screenWidth * 0.25,
-                color: Theme.of(context).primaryColor,
-              ),
-              SizedBox(height: screenHeight * 0.02),
-              Text(
-                'FindMyTutor',
-                style: TextStyle(
-                  fontSize: screenWidth * 0.08,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).primaryColor,
-                ),
+              Image.asset(
+                'assets/images/logo.png',
+                width: screenWidth * 0.6,
               ),
               SizedBox(height: screenHeight * 0.03),
               const CircularProgressIndicator(),

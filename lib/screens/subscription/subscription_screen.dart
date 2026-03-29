@@ -334,7 +334,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   _buildFeatureItem('Direct chat access from search results'),
                   _buildFeatureItem('Real-time notifications'),
                   _buildFeatureItem('Priority support'),
-                  _buildFeatureItem('Ad-free experience'),
                   const SizedBox(height: 30),
 
                   // Pricing

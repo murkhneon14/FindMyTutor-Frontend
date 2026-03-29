@@ -1,3 +1,5 @@
+import org.gradle.api.file.Directory
+
 allprojects {
     repositories {
         google()
@@ -5,6 +7,7 @@ allprojects {
     }
 }
 
+// Match Flutter tooling: APKs must land under <project>/build/app/outputs/flutter-apk/
 val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
 rootProject.layout.buildDirectory.value(newBuildDir)
 
@@ -12,6 +15,7 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
 subprojects {
     project.evaluationDependsOn(":app")
 }

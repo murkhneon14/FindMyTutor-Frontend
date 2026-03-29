@@ -33,6 +33,16 @@ migrate_working_dir/
 .pub/
 /build/
 
+# Android / Gradle build outputs (never commit — GitHub rejects large binaries)
+android/app/build/
+android/build/
+android/.gradle/
+
+# Release artifacts (build locally; do not commit)
+*.aab
+*.apk
+app-release.aab
+
 # Symbolication related
 app.*.symbols
 

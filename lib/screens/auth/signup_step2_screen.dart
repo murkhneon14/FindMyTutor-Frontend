@@ -1010,7 +1010,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     return GestureDetector(
       onTap: () => setState(() => _selectedGender = gender),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
         decoration: BoxDecoration(
           color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -1027,14 +1027,18 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             Icon(
               icon,
               color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
-              size: 20,
+              size: 18,
             ),
-            const SizedBox(width: 8),
-            Text(
-              gender,
-              style: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                gender,
+                style: TextStyle(
+                  color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],

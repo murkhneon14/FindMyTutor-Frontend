@@ -1183,8 +1183,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
       '11th',
       '12th',
       'Bachelor\'s',
-      'Master\'s',
-      'PhD',
     ];
     
     return Padding(

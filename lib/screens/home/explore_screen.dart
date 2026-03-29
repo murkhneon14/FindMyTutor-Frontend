@@ -576,7 +576,8 @@ class _ExploreScreenState extends State<ExploreScreen>
       final token = prefs.getString('auth_token');
       print('Auth Token: ${token != null ? 'Token exists' : 'No token found'}');
 
-      if (token == null) {
+      if (token == null) { 
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -2196,16 +2197,6 @@ class _ExploreScreenState extends State<ExploreScreen>
                               : AppTheme.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subjects,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDarkMode
-                              ? Colors.grey[400]
-                              : Colors.grey[600],
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -2657,7 +2648,9 @@ class _ExploreScreenState extends State<ExploreScreen>
           children: const [
             Icon(Icons.lock, color: Color(0xFF6C63FF), size: 28),
             SizedBox(width: 10),
-            Text('Premium Feature'),
+            Flexible(
+              child: Text('Premium Feature'),
+            ),
           ],
         ),
         content: Column(

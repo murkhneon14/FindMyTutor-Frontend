@@ -13,6 +13,9 @@ import 'privacy_policy_screen.dart';
 import 'terms_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../../services/auth_service.dart';
+import '../../services/subscription_service.dart';
+import '../../models/subscription_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -24,6 +27,8 @@ class AccountScreen extends StatefulWidget {
 class _AccountScreenState extends State<AccountScreen> {
   bool _isLoggedIn = false; // This would come from your auth state management
   bool _loading = false;
+  bool _isPremium = false;
+  SubscriptionModel? _subscription;
   Map<String, dynamic>? _user;
 
   @override
@@ -41,6 +46,14 @@ class _AccountScreenState extends State<AccountScreen> {
     });
     if (hasToken) {
       await _fetchMe(token!);
+    }
+    // Check premium status and fetch subscription details
+    final isPremium = await SubscriptionService().isPremiumUser();
+    if (mounted) {
+      setState(() => _isPremium = isPremium);
+    }
+    if (isPremium) {
+      await _fetchSubscriptionDetails();
     }
   }
 
@@ -85,6 +98,157 @@ class _AccountScreenState extends State<AccountScreen> {
         });
       }
     }
+  }
+
+  Future<void> _fetchSubscriptionDetails() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString('user_id');
+      if (userId == null) return;
+
+      final status = await SubscriptionService().getSubscriptionStatus(userId);
+      if (status['subscription'] != null && mounted) {
+        setState(() {
+          _subscription = SubscriptionModel.fromJson(status['subscription']);
+        });
+      }
+    } catch (e) {
+      print('❌ Error fetching subscription details: $e');
+    }
+  }
+
+  Widget _buildSubscriptionStatusCard() {
+    final endDate = _subscription != null
+        ? '${_subscription!.endDate.day}/${_subscription!.endDate.month}/${_subscription!.endDate.year}'
+        : 'N/A';
+    final status = _subscription?.status.toUpperCase() ?? 'ACTIVE';
+
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
+      ),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF059669),
+              Color(0xFF10B981),
+              Color(0xFF34D399),
+            ],
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF10B981).withOpacity(0.4),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -20,
+              right: -20,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified, color: Colors.amber[300], size: 16),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'PREMIUM ACTIVE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'You\'re a Premium Member! ✨',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Valid until: $endDate',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.white70, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Status: $status',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -307,20 +471,26 @@ class _AccountScreenState extends State<AccountScreen> {
               ),
             ),
             const SizedBox(height: 30),
-            // Premium Promotional Card
-            _buildPremiumPromotionalCard(),
-            const SizedBox(height: 16),
+            // Premium status card for premium users, or promo card for free users
+            if (_isPremium) ...[
+              _buildSubscriptionStatusCard(),
+              const SizedBox(height: 16),
+            ] else ...[
+              _buildPremiumPromotionalCard(),
+              const SizedBox(height: 16),
+            ],
             // Advertisement Banner
             _buildAdvertisementBanner(),
             const SizedBox(height: 20),
-            // Menu Items
-            _buildMenuItem(
-              Icons.workspace_premium,
-              'Premium',
-              'Upgrade to unlock premium features',
-              () => _showPremiumDialog(context),
-              isPremium: true,
-            ),
+            // Menu Items (hide Premium upgrade for premium users)
+            if (!_isPremium)
+              _buildMenuItem(
+                Icons.workspace_premium,
+                'Premium',
+                'Upgrade to unlock premium features',
+                () => _showPremiumDialog(context),
+                isPremium: true,
+              ),
             _buildMenuItem(
               Icons.help_outline,
               'FAQ',
@@ -627,15 +797,11 @@ class _AccountScreenState extends State<AccountScreen> {
 
   Widget _buildAdvertisementBanner() {
     return InkWell(
-      onTap: () {
-        // You can add email launch functionality here
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Contact us at support@findmytutor.com'),
-            backgroundColor: Color(0xFF2563EB),
-            duration: Duration(seconds: 3),
-          ),
-        );
+      onTap: () async {
+        final url = Uri.parse('https://wa.me/918798053612?text=Hi%2C%20I%20want%20to%20advertise%20on%20FindMyTutor');
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -730,14 +896,14 @@ class _AccountScreenState extends State<AccountScreen> {
                   Row(
                     children: [
                       const Icon(
-                        Icons.email_outlined,
-                        color: Colors.white,
+                        Icons.chat,
+                        color: Color(0xFF25D366),
                         size: 18,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'support@findmytutor.com',
+                          '+91 8798053612',
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.95),
                             fontSize: 14,
