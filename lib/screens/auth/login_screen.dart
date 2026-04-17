@@ -47,13 +47,16 @@ class _LoginScreenState extends State<LoginScreen> {
       _canResend = false;
       _resendCountdown = 60;
     });
-    
+    _tickCountdown();
+  }
+
+  void _tickCountdown() {
     Future.delayed(const Duration(seconds: 1), () {
       if (mounted && _resendCountdown > 0) {
         setState(() {
           _resendCountdown--;
           if (_resendCountdown > 0) {
-            _startResendCountdown();
+            _tickCountdown();
           } else {
             _canResend = true;
           }

@@ -173,10 +173,10 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             return;
           }
           
-          if (_subjectController.text.trim().isEmpty) {
+          if (_selectedSubjects.isEmpty) {
             setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please enter your subject')),
+              const SnackBar(content: Text('Please select at least one preferred subject')),
             );
             return;
           }
@@ -217,7 +217,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             'gender': _selectedGender!.toLowerCase(),
             'qualifications': _instituteController.text.trim(),
             'experience': _experienceController.text.trim(),
-            'subjects': _selectedSubjects.isNotEmpty ? _selectedSubjects : [_subjectController.text.trim()],
+            'subjects': _selectedSubjects,
             'preferredClasses': _selectedPreferredClasses,
             'fees': 0,
             'timings': 'flexible',
@@ -551,26 +551,10 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                           // Conditional Fields based on User Type
                           if (_isTeacher) ...[
                             // Teacher Specific Fields
-                            _buildTextField(
-                              controller: _subjectController,
-                              label: 'Subject',
-                              hint: 'Select your subject',
-                              icon: Icons.menu_book_outlined,
-                              readOnly: true,
-                              onTap: () => _showSubjectPicker(context),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please select a subject';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            
                             // Multi-select Subjects
                             _buildMultiSelectField(
-                              label: 'Subjects (Multiple)',
-                              hint: 'Tap to select multiple subjects',
+                              label: 'Preferred Subjects',
+                              hint: 'Tap to select preferred subjects',
                               icon: Icons.library_books_outlined,
                               selectedItems: _selectedSubjects,
                               onTap: () => _showMultiSubjectPicker(context),
@@ -590,15 +574,13 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             _buildTextField(
                               controller: _experienceController,
                               label: 'Years of Experience',
-                              hint: 'Enter years of experience',
+                              hint: 'Select years of experience',
                               icon: Icons.work_outline,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
+                              readOnly: true,
+                              onTap: () => _showExperiencePicker(context),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please enter years of experience';
+                                  return 'Please select years of experience';
                                 }
                                 return null;
                               },
@@ -1227,6 +1209,38 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     if (selected != null && mounted) {
       setState(() {
         _subjectController.text = selected;
+      });
+    }
+  }
+
+  void _showExperiencePicker(BuildContext context) async {
+    final options = [
+      'Beginner',
+      '1+',
+      '2+',
+      '3+',
+      '4+',
+      '5+',
+      '6+',
+      '7+',
+      '8+',
+      '9+',
+      '10+',
+      '10+ above'
+    ];
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildPickerSheet(
+        'Select Experience',
+        options,
+        _experienceController.text,
+      ),
+    );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _experienceController.text = selected;
       });
     }
   }

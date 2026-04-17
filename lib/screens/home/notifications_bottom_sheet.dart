@@ -22,6 +22,7 @@ class NotificationsBottomSheet extends StatefulWidget {
 class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
   List<NotificationItem> _notifications = [];
   bool _isLoading = true;
+  bool _isPremium = false;
   final SubscriptionService _subscriptionService = SubscriptionService();
 
   @override
@@ -32,9 +33,11 @@ class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
 
   Future<void> _loadNotifications() async {
     setState(() => _isLoading = true);
+    final isPremium = await _subscriptionService.isPremiumUser();
     final list = await NotificationStorageService.fetchAndSave();
     if (mounted) {
       setState(() {
+        _isPremium = isPremium;
         _notifications = list;
         _isLoading = false;
       });
@@ -198,7 +201,11 @@ class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
                               ),
                             ),
                             title: Text(
-                              n.title,
+                              (!_isPremium && n.chatId != null) 
+                                  ? (n.title.startsWith('Message from ') 
+                                      ? n.title.replaceAll('Message from ', '') 
+                                      : n.title)
+                                  : n.title,
                               style: TextStyle(
                                 fontWeight:
                                     n.isRead ? FontWeight.normal : FontWeight.w600,
@@ -206,14 +213,19 @@ class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
                               ),
                             ),
                             subtitle: Text(
-                              n.body,
+                              (!_isPremium && n.chatId != null)
+                                  ? "wants to send you a message. Tap to subscribe."
+                                  : n.body,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDarkMode
-                                    ? Colors.white70
-                                    : Colors.grey[600],
+                                color: !_isPremium && n.chatId != null
+                                    ? AppTheme.primaryColor
+                                    : (isDarkMode ? Colors.white70 : Colors.grey[600]),
+                                fontWeight: !_isPremium && n.chatId != null
+                                    ? FontWeight.w500
+                                    : FontWeight.normal,
                               ),
                             ),
                             trailing: Text(

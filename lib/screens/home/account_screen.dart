@@ -1022,29 +1022,24 @@ class _AccountScreenState extends State<AccountScreen> {
             _buildPremiumFeature('💬 Priority chat support'),
             _buildPremiumFeature('🔔 Instant notifications'),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
-              ),
+            Center(
               child: Column(
                 children: [
-                  const Text(
+                  Text(
                     'Premium Plan',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     '₹49/month',
                     style: TextStyle(
-                      color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 22,
+                      fontSize: 28,
+                      color: AppTheme.primaryColor,
                     ),
                   ),
                 ],

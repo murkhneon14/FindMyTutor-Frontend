@@ -8,6 +8,7 @@ import '../models/notification_item.dart';
 import '../screens/subscription/subscription_screen.dart';
 import 'subscription_service.dart';
 import '../config/navigator_key.dart';
+import '../config/api.dart';
 
 class GlobalNotificationManager {
   static final GlobalNotificationManager _instance = GlobalNotificationManager._internal();
@@ -37,7 +38,7 @@ class GlobalNotificationManager {
         if (!_socketService.isConnected) {
           print('🔔 Connecting to socket...');
           _socketService.connect(
-            'https://findmy-tutor-backend.onrender.com',
+            ApiConfig.socketUrl,
             _currentUserId!,
           );
         } else {
