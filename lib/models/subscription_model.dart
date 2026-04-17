@@ -1,24 +1,20 @@
 class SubscriptionModel {
   final String id;
   final String userId;
-  final String subscriptionId;
-  final String planId;
+  final String orderId;
   final String status;
   final DateTime startDate;
   final DateTime endDate;
-  final DateTime? nextBillingDate;
   final double amount;
   final String currency;
 
   SubscriptionModel({
     required this.id,
     required this.userId,
-    required this.subscriptionId,
-    required this.planId,
+    required this.orderId,
     required this.status,
     required this.startDate,
     required this.endDate,
-    this.nextBillingDate,
     required this.amount,
     required this.currency,
   });
@@ -27,14 +23,10 @@ class SubscriptionModel {
     return SubscriptionModel(
       id: json['_id'] ?? '',
       userId: json['userId'] ?? '',
-      subscriptionId: json['subscriptionId'] ?? '',
-      planId: json['planId'] ?? '',
+      orderId: json['orderId'] ?? '',
       status: json['status'] ?? 'expired',
       startDate: DateTime.parse(json['startDate']),
       endDate: DateTime.parse(json['endDate']),
-      nextBillingDate: json['nextBillingDate'] != null
-          ? DateTime.parse(json['nextBillingDate'])
-          : null,
       amount: (json['amount'] ?? 0).toDouble(),
       currency: json['currency'] ?? 'INR',
     );
@@ -44,16 +36,19 @@ class SubscriptionModel {
     return {
       '_id': id,
       'userId': userId,
-      'subscriptionId': subscriptionId,
-      'planId': planId,
+      'orderId': orderId,
       'status': status,
       'startDate': startDate.toIso8601String(),
       'endDate': endDate.toIso8601String(),
-      'nextBillingDate': nextBillingDate?.toIso8601String(),
       'amount': amount,
       'currency': currency,
     };
   }
 
   bool get isActive => status == 'active' && endDate.isAfter(DateTime.now());
+
+  int get daysRemaining {
+    if (!isActive) return 0;
+    return endDate.difference(DateTime.now()).inDays;
+  }
 }

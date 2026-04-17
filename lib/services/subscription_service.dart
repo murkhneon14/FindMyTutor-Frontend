@@ -50,10 +50,10 @@ class SubscriptionService {
     print('External Wallet: ${response.walletName}');
   }
 
-  // Create subscription
-  Future<Map<String, dynamic>> createSubscription(String userId) async {
+  // Create a one-time payment order (not a subscription)
+  Future<Map<String, dynamic>> createOrder(String userId) async {
     try {
-      print('💳 Creating subscription for user: $userId');
+      print('💳 Creating payment order for user: $userId');
       print('💳 Endpoint: ${ApiConfig.subscriptionCreate}');
 
       final response = await http.post(
@@ -68,42 +68,43 @@ class SubscriptionService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        print('❌ Failed to create subscription: ${response.body}');
-        throw Exception('Failed to create subscription');
+        print('❌ Failed to create order: ${response.body}');
+        throw Exception('Failed to create payment order');
       }
     } catch (e) {
-      print('❌ Error creating subscription: $e');
-      throw Exception('Error creating subscription: $e');
+      print('❌ Error creating order: $e');
+      throw Exception('Error creating payment order: $e');
     }
   }
 
-  // Open Razorpay checkout
+  // Open Razorpay checkout for one-time payment (order-based)
   void openCheckout({
-    required String subscriptionId,
+    required String orderId,
     required int amount,
     required String userEmail,
     required String userName,
+    required String razorpayKey,
     required Function(PaymentSuccessResponse) onSuccess,
     required Function(PaymentFailureResponse) onError,
   }) {
     _onPaymentSuccess = onSuccess;
     _onPaymentError = onError;
 
-    print('💳 Opening Razorpay checkout');
-    print('💳 Subscription ID: $subscriptionId');
+    print('💳 Opening Razorpay checkout (one-time payment)');
+    print('💳 Order ID: $orderId');
     print('💳 Amount: $amount');
     print('💳 Email: $userEmail');
     print('💳 Name: $userName');
 
     var options = {
-      'key': 'rzp_live_SVq0xKONWPidTi', 
-      'subscription_id': subscriptionId,
+      'key': razorpayKey,
+      'order_id': orderId,
       'amount': amount,
       'currency': 'INR',
       'name': 'FindMyTutor Premium',
-      'description': 'Monthly Premium Subscription',
+      'description': '30 Days Premium Access',
       'prefill': {'email': userEmail, 'contact': ''},
-      'theme': {'color': '#6C63FF'},
+      'theme': {'color': '#2E7D32'},
     };
 
     try {
@@ -114,10 +115,10 @@ class SubscriptionService {
     }
   }
 
-  // Verify subscription payment with retry logic
-  Future<bool> verifySubscription({
+  // Verify one-time payment with retry logic
+  Future<bool> verifyPayment({
     required String userId,
-    required String subscriptionId,
+    required String orderId,
     required String paymentId,
     required String signature,
     int maxRetries = 3,
@@ -131,14 +132,14 @@ class SubscriptionService {
           '🔐 ========== VERIFYING PAYMENT (Attempt $attempt/$maxRetries) ==========',
         );
         print('🔐 User ID: $userId');
-        print('🔐 Subscription ID: $subscriptionId');
+        print('🔐 Order ID: $orderId');
         print('🔐 Payment ID: $paymentId');
         print('🔐 Signature: $signature');
         print('🔐 Endpoint: ${ApiConfig.subscriptionVerify}');
 
         // Validate required fields
         if (userId.isEmpty ||
-            subscriptionId.isEmpty ||
+            orderId.isEmpty ||
             paymentId.isEmpty ||
             signature.isEmpty) {
           print('❌ Missing required fields for verification');
@@ -147,7 +148,7 @@ class SubscriptionService {
 
         final requestBody = {
           'userId': userId,
-          'razorpay_subscription_id': subscriptionId,
+          'razorpay_order_id': orderId,
           'razorpay_payment_id': paymentId,
           'razorpay_signature': signature,
         };
@@ -201,8 +202,8 @@ class SubscriptionService {
             );
             // If already verified, return true
             if (data['message']?.toString().toLowerCase().contains(
-                  'already verified',
-                ) ==
+                      'already verified',
+                    ) ==
                 true) {
               final prefs = await SharedPreferences.getInstance();
               await prefs.setBool('isPremium', true);
@@ -226,7 +227,7 @@ class SubscriptionService {
         }
       } catch (e) {
         print(
-          '❌ Error verifying subscription (Attempt $attempt/$maxRetries): $e',
+          '❌ Error verifying payment (Attempt $attempt/$maxRetries): $e',
         );
 
         // Network errors - retry
@@ -290,36 +291,6 @@ class SubscriptionService {
     } catch (e) {
       print('❌ Error getting subscription status: $e');
       throw Exception('Error getting subscription status: $e');
-    }
-  }
-
-  // Cancel subscription
-  Future<bool> cancelSubscription(String userId) async {
-    try {
-      print('❌ Cancelling subscription for user: $userId');
-
-      final response = await http.post(
-        Uri.parse(ApiConfig.subscriptionCancel),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId}),
-      );
-
-      print('❌ Cancel response status: ${response.statusCode}');
-      print('❌ Cancel response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          // Update local premium status
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('isPremium', false);
-          return true;
-        }
-      }
-      return false;
-    } catch (e) {
-      print('Error cancelling subscription: $e');
-      return false;
     }
   }
 

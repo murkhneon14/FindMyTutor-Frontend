@@ -36,16 +36,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       _userId = prefs.getString('user_id');
-      
+
       print('📱 Subscription Screen - Loading user data');
       print('📱 User ID: ${_userId ?? "NULL"}');
 
       if (_userId != null) {
-        final status = await _subscriptionService.getSubscriptionStatus(_userId!);
+        final status =
+            await _subscriptionService.getSubscriptionStatus(_userId!);
         setState(() {
           _isPremium = status['isPremium'] ?? false;
           if (status['subscription'] != null) {
-            _subscription = SubscriptionModel.fromJson(status['subscription']);
+            _subscription =
+                SubscriptionModel.fromJson(status['subscription']);
           }
         });
       }
@@ -56,10 +58,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     }
   }
 
-  Future<void> _subscribeToPremium() async {
-    print('📱 Subscribe button pressed');
+  Future<void> _buyPremium() async {
+    print('📱 Buy Premium button pressed');
     print('📱 Current User ID: ${_userId ?? "NULL"}');
-    
+
     if (_userId == null) {
       print('❌ User ID is null - showing error');
       _showError('User not found. Please login again.');
@@ -74,54 +76,59 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       final userEmail = prefs.getString('user_email') ?? '';
       final userName = prefs.getString('user_name') ?? '';
 
-      // Create subscription
-      print('📱 Creating subscription for user: $_userId');
-      final result = await _subscriptionService.createSubscription(_userId!);
+      // Create one-time payment order
+      print('📱 Creating payment order for user: $_userId');
+      final result = await _subscriptionService.createOrder(_userId!);
 
-      print('📱 Create subscription result: $result');
+      print('📱 Create order result: $result');
 
       if (result['success'] == true) {
-        final razorpaySubscriptionId = result['subscriptionId'];
+        final orderId = result['orderId'];
         final amount = result['amount'];
+        final razorpayKey = result['key'];
 
-        print('💳 Razorpay Subscription ID: $razorpaySubscriptionId');
+        print('💳 Razorpay Order ID: $orderId');
         print('💳 Amount: $amount');
+        print('💳 Key: $razorpayKey');
 
-        if (razorpaySubscriptionId == null ||
-            razorpaySubscriptionId.isEmpty) {
-          _showError('Invalid subscription ID received from server');
+        if (orderId == null || orderId.isEmpty) {
+          _showError('Invalid order ID received from server');
           return;
         }
 
-        // Open Razorpay checkout
+        // Open Razorpay checkout (one-time payment)
         _subscriptionService.openCheckout(
-          subscriptionId: razorpaySubscriptionId,
-          amount: result['amount'],
+          orderId: orderId,
+          amount: amount,
           userEmail: userEmail,
           userName: userName,
+          razorpayKey: razorpayKey,
           onSuccess: (PaymentSuccessResponse response) async {
             print('💳 Payment Success Response:');
             print('💳 Payment ID: ${response.paymentId}');
             print('💳 Order ID: ${response.orderId}');
             print('💳 Signature: ${response.signature}');
-            
+
             // Show loading during verification
             setState(() => _isLoading = true);
-            
+
             try {
               // Validate payment response
-              if (response.paymentId == null || response.paymentId!.isEmpty ||
-                  response.signature == null || response.signature!.isEmpty) {
+              if (response.paymentId == null ||
+                  response.paymentId!.isEmpty ||
+                  response.signature == null ||
+                  response.signature!.isEmpty) {
                 setState(() => _isLoading = false);
-                _showError('Invalid payment response. Please contact support with Payment ID: ${response.paymentId ?? "N/A"}');
+                _showError(
+                    'Invalid payment response. Please contact support with Payment ID: ${response.paymentId ?? "N/A"}');
                 return;
               }
-              
-              // Verify payment - use the stored subscription ID, not order ID
+
+              // Verify payment with backend
               print('🔐 Starting payment verification...');
-              final verified = await _subscriptionService.verifySubscription(
+              final verified = await _subscriptionService.verifyPayment(
                 userId: _userId!,
-                subscriptionId: razorpaySubscriptionId,
+                orderId: response.orderId ?? orderId,
                 paymentId: response.paymentId!,
                 signature: response.signature!,
               );
@@ -131,29 +138,26 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               if (verified) {
                 // Wait a moment for database to sync
                 await Future.delayed(const Duration(milliseconds: 500));
-                
+
                 // Reload user data to reflect premium status
                 await _loadUserData();
-                
+
                 // Verify premium status was actually updated
                 if (_isPremium) {
-                  _showSuccess('Subscription activated successfully!');
+                  _showSuccess('🎉 Premium activated for 30 days!');
                 } else {
-                  // Premium status not updated yet, but verification succeeded
-                  _showSuccess('Payment verified! Premium status will be activated shortly.');
-                  // Try reloading again after a delay
+                  _showSuccess(
+                      'Payment verified! Premium status will be activated shortly.');
                   Future.delayed(const Duration(seconds: 2), () async {
                     await _loadUserData();
                   });
                 }
               } else {
-                // Payment succeeded but verification failed
                 _showError(
                   'Payment received but verification failed. '
                   'Your payment has been processed. Please wait a few moments and refresh, '
-                  'or contact support with Payment ID: ${response.paymentId}'
+                  'or contact support with Payment ID: ${response.paymentId}',
                 );
-                // Still reload data in case it was updated
                 await _loadUserData();
               }
             } catch (e) {
@@ -162,9 +166,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               _showError(
                 'Error verifying payment: $e. '
                 'Your payment has been processed. Please wait a few moments and refresh, '
-                'or contact support with Payment ID: ${response.paymentId ?? "N/A"}'
+                'or contact support with Payment ID: ${response.paymentId ?? "N/A"}',
               );
-              // Still reload data in case it was updated
               await _loadUserData();
             }
           },
@@ -176,53 +179,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           },
         );
       } else {
-        _showError('Failed to create subscription');
+        _showError('Failed to create payment order');
       }
     } catch (e) {
       _showError('Error: $e');
     } finally {
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _cancelSubscription() async {
-    if (_userId == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Subscription'),
-        content: const Text(
-          'Are you sure you want to cancel your premium subscription? You will lose access to messaging features.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Yes, Cancel'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      setState(() => _isLoading = true);
-      try {
-        final success = await _subscriptionService.cancelSubscription(_userId!);
-        if (success) {
-          _showSuccess('Subscription cancelled successfully');
-          _loadUserData();
-        } else {
-          _showError('Failed to cancel subscription');
-        }
-      } catch (e) {
-        _showError('Error: $e');
-      } finally {
-        setState(() => _isLoading = false);
-      }
     }
   }
 
@@ -240,6 +202,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.green,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -272,21 +235,24 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [Color(0xFF2E7D32), Color(0xFF66BB6A)],
+                                  colors: [
+                                    Color(0xFF2E7D32),
+                                    Color(0xFF66BB6A)
+                                  ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: const Column(
+                              child: Column(
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.verified,
                                     size: 80,
                                     color: Colors.white,
                                   ),
-                                  SizedBox(height: 10),
-                                  Text(
+                                  const SizedBox(height: 10),
+                                  const Text(
                                     'Premium Member',
                                     style: TextStyle(
                                       fontSize: 24,
@@ -294,6 +260,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       color: Colors.white,
                                     ),
                                   ),
+                                  if (_subscription != null) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${_subscription!.daysRemaining} days remaining',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -304,9 +280,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         // Subscription Status (premium users)
                         if (_isPremium && _subscription != null) ...[
                           _buildInfoCard(
-                            'Subscription Status',
+                            'Status',
                             _subscription!.status.toUpperCase(),
-                            Icons.info,
+                            Icons.check_circle,
                             _themeGreen,
                           ),
                           const SizedBox(height: 15),
@@ -316,23 +292,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             Icons.calendar_today,
                             _themeGreenLight,
                           ),
-                          if (_subscription!.nextBillingDate != null) ...[
-                            const SizedBox(height: 15),
-                            _buildInfoCard(
-                              'Next Billing',
-                              _formatDate(_subscription!.nextBillingDate!),
-                              Icons.payment,
-                              Colors.orange,
-                            ),
-                          ],
+                          const SizedBox(height: 15),
+                          _buildInfoCard(
+                            'Amount Paid',
+                            '₹${_subscription!.amount.toStringAsFixed(0)}',
+                            Icons.payment,
+                            Colors.orange,
+                          ),
                           const SizedBox(height: 20),
                         ],
 
-                        // Pricing Card — shown first for non-premium users
+                        // Pricing Card — shown for non-premium users
                         if (!_isPremium) ...[
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 24, horizontal: 20),
                             decoration: BoxDecoration(
                               color: _themeGreen.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(16),
@@ -343,8 +318,26 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             ),
                             child: Column(
                               children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _themeGreen,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'ONE-TIME PAYMENT',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
                                 const Text(
-                                  'Monthly Subscription',
+                                  '30 Days Premium Access',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -364,7 +357,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '49',
+                                      '299',
                                       style: TextStyle(
                                         fontSize: 44,
                                         fontWeight: FontWeight.bold,
@@ -372,17 +365,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                         color: _themeGreen,
                                       ),
                                     ),
-                                    Padding(
-                                      padding: EdgeInsets.only(bottom: 4),
-                                      child: Text(
-                                        '/month',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ),
                                   ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'No auto-renewal • No recurring charges',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
                                 ),
                               ],
                             ),
@@ -399,17 +390,56 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildFeatureItem('Unlimited messaging with teachers and students'),
-                        _buildFeatureItem('Direct chat access from search results'),
+                        _buildFeatureItem(
+                            'Unlimited messaging with teachers and students'),
+                        _buildFeatureItem(
+                            'Direct chat access from search results'),
                         _buildFeatureItem('Real-time notifications'),
                         _buildFeatureItem('Priority support'),
+                        _buildFeatureItem(
+                            'Appear higher in search results'),
+                        _buildFeatureItem(
+                            'Access to premium teacher/student profiles'),
                         const SizedBox(height: 20),
 
-                        // Pricing card for premium users (shown below features)
-                        if (_isPremium) ...[
+                        // Payment security info
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.blue.shade100),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.shield_outlined,
+                                color: Colors.blue.shade700,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Payments secured by Razorpay. No card details stored.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Renew info for premium users
+                        if (_isPremium && _subscription != null) ...[
+                          const SizedBox(height: 20),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 20, horizontal: 20),
                             decoration: BoxDecoration(
                               color: _themeGreen.withOpacity(0.08),
                               borderRadius: BorderRadius.circular(16),
@@ -421,16 +451,26 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             child: Column(
                               children: [
                                 const Text(
-                                  'Monthly Subscription',
+                                  'Renew Premium',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Extend by another 30 days',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
                                 const SizedBox(height: 8),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.end,
                                   children: const [
                                     Text(
                                       '₹',
@@ -441,7 +481,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '49',
+                                      '299',
                                       style: TextStyle(
                                         fontSize: 44,
                                         fontWeight: FontWeight.bold,
@@ -449,22 +489,11 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                         color: _themeGreen,
                                       ),
                                     ),
-                                    Padding(
-                                      padding: EdgeInsets.only(bottom: 4),
-                                      child: Text(
-                                        '/month',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    ),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 20),
                         ],
                       ],
                     ),
@@ -488,15 +517,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   child: SizedBox(
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: _isPremium ? _cancelSubscription : _subscribeToPremium,
+                      onPressed: _buyPremium,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isPremium ? Colors.red : _themeGreen,
+                        backgroundColor: _themeGreen,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
                       ),
                       child: Text(
-                        _isPremium ? 'Cancel Subscription' : 'Subscribe Now',
+                        _isPremium
+                            ? 'Renew Premium (₹299)'
+                            : 'Buy Premium – ₹299',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -511,7 +542,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _buildInfoCard(String title, String value, IconData icon, Color color) {
+  Widget _buildInfoCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
