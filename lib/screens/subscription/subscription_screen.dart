@@ -357,7 +357,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '299',
+                                      '49',
                                       style: TextStyle(
                                         fontSize: 44,
                                         fontWeight: FontWeight.bold,
@@ -481,7 +481,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '299',
+                                      '49',
                                       style: TextStyle(
                                         fontSize: 44,
                                         fontWeight: FontWeight.bold,
@@ -526,8 +526,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       ),
                       child: Text(
                         _isPremium
-                            ? 'Renew Premium (₹299)'
-                            : 'Buy Premium – ₹299',
+                            ? 'Renew Premium (₹49)'
+                            : 'Buy Premium – ₹49',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
