@@ -127,7 +127,7 @@ class _AccountScreenState extends State<AccountScreen> {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const SubscriptionScreen()),
-      ),
+      ).then((_) => _bootstrap()),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
@@ -1064,7 +1064,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         MaterialPageRoute(
                           builder: (context) => const SubscriptionScreen(),
                         ),
-                      );
+                      ).then((_) => _bootstrap());
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,

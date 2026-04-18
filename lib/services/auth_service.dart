@@ -247,9 +247,10 @@ class AuthService {
       if (userPhone != null) await prefs.setString('user_phone', userPhone);
       if (userEmail != null) await prefs.setString('user_email', userEmail);
       if (userRole != null) await prefs.setString('user_role', userRole);
+      if (user['isPremium'] != null) await prefs.setBool('isPremium', user['isPremium'] == true);
 
       debugPrint(
-          'Saved user data: ID=$userId, Name=$userName, Phone=$userPhone, Role=$userRole');
+          'Saved user data: ID=$userId, Name=$userName, Phone=$userPhone, Role=$userRole, isPremium=${user['isPremium']}');
 
       // Send FCM token to backend
       if (userId != null) {

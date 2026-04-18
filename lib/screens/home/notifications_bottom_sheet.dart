@@ -65,7 +65,7 @@ class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
           MaterialPageRoute(
             builder: (context) => const SubscriptionScreen(),
           ),
-        );
+        ).then((_) => _loadNotifications());
       } else if (isPremium && userId.isNotEmpty && mounted) {
         try {
           final chats = await ChatService().getUserChats(userId);

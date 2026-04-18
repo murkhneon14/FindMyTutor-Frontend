@@ -80,7 +80,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   MaterialPageRoute(
                     builder: (context) => const SubscriptionScreen(),
                   ),
-                );
+                ).then((_) => _checkPremiumAndInitialize());
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF6C63FF),
