@@ -38,6 +38,8 @@ class _ExploreScreenState extends State<ExploreScreen>
   List<String> _selectedPreferredClasses =
       []; // Filter by preferred classes/grades
   String? _selectedGender; // Filter by gender (for students searching teachers)
+  final TextEditingController _minFeeFilterController = TextEditingController();
+  final TextEditingController _maxFeeFilterController = TextEditingController();
   double _searchRadius = 5.0; // km
   String? _currentUserId;
   String? _currentUserName;
@@ -503,6 +505,23 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ?.toString();
             return teacherGender?.toLowerCase() ==
                 _selectedGender!.toLowerCase();
+          }).toList();
+        }
+
+        // Client-side fee range filter
+        final minFeeFilter = int.tryParse(_minFeeFilterController.text.trim());
+        final maxFeeFilter = int.tryParse(_maxFeeFilterController.text.trim());
+        if (minFeeFilter != null || maxFeeFilter != null) {
+          filteredTutors = filteredTutors.where((t) {
+            final tMinFees = (t['minFees'] ?? t['fees'] ?? 0) is int
+                ? (t['minFees'] ?? t['fees'] ?? 0)
+                : int.tryParse((t['minFees'] ?? t['fees'] ?? '0').toString()) ?? 0;
+            final tMaxFees = (t['maxFees'] ?? t['fees'] ?? 0) is int
+                ? (t['maxFees'] ?? t['fees'] ?? 0)
+                : int.tryParse((t['maxFees'] ?? t['fees'] ?? '0').toString()) ?? 0;
+            if (minFeeFilter != null && tMaxFees < minFeeFilter) return false;
+            if (maxFeeFilter != null && tMinFees > maxFeeFilter) return false;
+            return true;
           }).toList();
         }
 
@@ -1813,6 +1832,128 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ],
               ),
 
+              // Fee Range Filter (only for students)
+              if (_userRole != 'teacher') ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Filter by Fee Range (₹/month)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'lower range',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _minFeeFilterController,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Min',
+                              hintStyle: TextStyle(
+                                color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+                              ),
+                              filled: true,
+                              fillColor: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              prefixText: '₹ ',
+                              prefixStyle: TextStyle(
+                                color: isDarkMode ? Colors.white54 : AppTheme.primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'higher range',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _maxFeeFilterController,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'Max',
+                              hintStyle: TextStyle(
+                                color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
+                              ),
+                              filled: true,
+                              fillColor: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade100,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              prefixText: '₹ ',
+                              prefixStyle: TextStyle(
+                                color: isDarkMode ? Colors.white54 : AppTheme.primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (_minFeeFilterController.text.isNotEmpty || _maxFeeFilterController.text.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _minFeeFilterController.clear();
+                          _maxFeeFilterController.clear();
+                        });
+                      },
+                      icon: const Icon(Icons.clear_all, size: 16),
+                      label: const Text('Clear'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: isDarkMode
+                            ? Colors.white70
+                            : Colors.black87,
+                      ),
+                    ),
+                  ),
+              ],
+
               // Gender Filter (only for students)
               if (_userRole != 'teacher') ...[
                 const SizedBox(height: 16),
@@ -1921,7 +2062,9 @@ class _ExploreScreenState extends State<ExploreScreen>
                       ? _selectedPreferredClasses.isNotEmpty
                       : (_selectedSubjects.isNotEmpty ||
                           _selectedPreferredClasses.isNotEmpty ||
-                          _selectedGender != null);
+                          _selectedGender != null ||
+                          _minFeeFilterController.text.trim().isNotEmpty ||
+                          _maxFeeFilterController.text.trim().isNotEmpty);
 
                   return Column(
                     children: [
@@ -2192,8 +2335,10 @@ class _ExploreScreenState extends State<ExploreScreen>
     final email = user['email']?.toString() ?? '';
     final subjects = (teacher['subjects'] as List?)?.join(', ') ?? 'N/A';
     final experience = teacher['experience']?.toString() ?? 'N/A';
-    final fees = teacher['fees']?.toDouble() ?? 0.0;
     final qualifications = teacher['qualifications']?.toString() ?? 'N/A';
+    final minFees = teacher['minFees']?.toInt();
+    final maxFees = teacher['maxFees']?.toInt();
+    final fees = teacher['fees']?.toDouble() ?? 0.0;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -2282,6 +2427,27 @@ class _ExploreScreenState extends State<ExploreScreen>
                   style: TextStyle(
                     fontSize: 13,
                     color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.currency_rupee_rounded,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  minFees != null && maxFees != null
+                      ? '₹$minFees - ₹$maxFees / month'
+                      : '₹${fees.toInt()} / month',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryColor,
                   ),
                 ),
               ],
@@ -2945,13 +3111,18 @@ class _AnimatedSubjectCardState extends State<_AnimatedSubjectCard>
                                         ),
                                       ),
                                       const SizedBox(height: 16),
-                                      Text(
-                                        widget.subject.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          widget.subject.name,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                          maxLines: 1,
                                         ),
                                       ),
                                     ],

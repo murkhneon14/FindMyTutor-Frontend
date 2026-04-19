@@ -38,6 +38,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   final _emailController = TextEditingController(); // Optional email
   final _addressController = TextEditingController();
   final _bioController = TextEditingController();
+  final _minFeesController = TextEditingController(text: '500');
+  final _maxFeesController = TextEditingController(text: '10000');
   
   bool _isLoading = false;
   bool _isTeacher = false;
@@ -101,6 +103,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     _emailController.dispose();
     _addressController.dispose();
     _bioController.dispose();
+    _minFeesController.dispose();
+    _maxFeesController.dispose();
     super.dispose();
   }
 
@@ -219,7 +223,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             'experience': _experienceController.text.trim(),
             'subjects': _selectedSubjects,
             'preferredClasses': _selectedPreferredClasses,
-            'fees': 0,
+            'fees': int.tryParse(_minFeesController.text.trim()) ?? 500, // Save start as base fee
+            'minFees': int.tryParse(_minFeesController.text.trim()) ?? 500,
+            'maxFees': int.tryParse(_maxFeesController.text.trim()) ?? 10000,
             'timings': 'flexible',
             'latitude': _currentLocation!.latitude,
             'longitude': _currentLocation!.longitude,
@@ -599,6 +605,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                 return null;
                               },
                             ),
+                            const SizedBox(height: 20),
+                            
+                            _buildFeeRangeSelector(),
                             const SizedBox(height: 20),
                             
                             // Location Section for Teachers
@@ -1108,6 +1117,88 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeeRangeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Monthly Fee Range (₹)',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'lower range',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _minFeesController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'Min',
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      prefixText: '₹ ',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'higher range',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: _maxFeesController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      hintText: 'Max',
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      prefixText: '₹ ',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );

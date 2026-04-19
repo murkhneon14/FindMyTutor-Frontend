@@ -13,6 +13,7 @@ import 'privacy_policy_screen.dart';
 import 'terms_screen.dart';
 import '../subscription/subscription_screen.dart';
 import '../../services/auth_service.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../services/subscription_service.dart';
 import '../../models/subscription_model.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -366,7 +367,11 @@ class _AccountScreenState extends State<AccountScreen> {
                 IconButton(
                   icon: const Icon(Icons.share),
                   onPressed: () {
-                    // Navigate to edit profile
+                    SharePlus.instance.share(
+                      ShareParams(
+                        text: 'Check out FindMyTutor - Find the best tutors near you!\n\nhttps://play.google.com/store/apps/details?id=com.findmytutor.app&hl=en_IN',
+                      ),
+                    );
                   },
                 ),
               ],
@@ -1067,21 +1072,39 @@ class _AccountScreenState extends State<AccountScreen> {
                       ).then((_) => _bootstrap());
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppTheme.primaryColor,
+                      padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: Colors.white, width: 0),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      elevation: 2,
+                      elevation: 6,
+                      shadowColor: const Color(0xFF2196F3).withOpacity(0.5),
                     ),
-                    child: const Text(
-                      'Upgrade Now',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryColor,
+                    child: Ink(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF2196F3), Color(0xFF1565C0)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Upgrade Now',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                          ],
+                        ),
                       ),
                     ),
                   ),

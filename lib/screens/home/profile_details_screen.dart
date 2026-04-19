@@ -42,6 +42,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
   late TextEditingController _feesController;
   late TextEditingController _timingsController;
   late TextEditingController _bioController;
+  late TextEditingController _minFeesController;
+  late TextEditingController _maxFeesController;
 
   String? _selectedGender;
   DateTime? _selectedDob;
@@ -85,6 +87,13 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     _experienceController = TextEditingController(text: teacherProfile?['experience']?.toString() ?? '');
     _subjectsController = TextEditingController(text: _formatSubjects(teacherProfile?['subjects']));
     _feesController = TextEditingController(text: teacherProfile?['fees']?.toString() ?? '');
+    
+    // Initialize fee range controllers
+    final minFees = teacherProfile?['minFees']?.toString() ?? '500';
+    final maxFees = teacherProfile?['maxFees']?.toString() ?? '10000';
+    _minFeesController = TextEditingController(text: minFees);
+    _maxFeesController = TextEditingController(text: maxFees);
+
     _timingsController = TextEditingController(text: teacherProfile?['timings']?.toString() ?? '');
     _bioController = TextEditingController(text: teacherProfile?['bio']?.toString() ?? '');
 
@@ -126,6 +135,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     _feesController.dispose();
     _timingsController.dispose();
     _bioController.dispose();
+    _minFeesController.dispose();
+    _maxFeesController.dispose();
     super.dispose();
   }
 
@@ -173,6 +184,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
           'experience': _experienceController.text.trim(),
           'subjects': _subjectsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
           'fees': int.tryParse(_feesController.text.trim()) ?? 0,
+          'minFees': int.tryParse(_minFeesController.text.trim()) ?? 500,
+          'maxFees': int.tryParse(_maxFeesController.text.trim()) ?? 10000,
           'timings': _timingsController.text.trim(),
         };
       } else {
@@ -595,13 +608,14 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                               keyboardType: TextInputType.number,
                             ),
                             _buildDivider(),
-                            _buildEditableField(
-                              icon: Icons.currency_rupee,
-                              label: 'Fees (per hour)',
-                              controller: _feesController,
-                              enabled: _isEditing,
-                              keyboardType: TextInputType.number,
-                            ),
+                            if (_isEditing)
+                              _buildFeeRangeSelector()
+                            else
+                              _buildReadOnlyField(
+                                icon: Icons.currency_rupee,
+                                label: 'Fee Range (per month)',
+                                value: '₹${_minFeesController.text} - ₹${_maxFeesController.text}',
+                              ),
                             _buildDivider(),
                             _buildEditableField(
                               icon: Icons.schedule,
@@ -1350,6 +1364,123 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                 ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeeRangeSelector() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? Colors.white.withOpacity(0.1)
+                  : AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.currency_rupee,
+              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Fee Range (per month)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'lower range',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _minFeesController,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: isDarkMode ? Colors.white : AppTheme.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: 'Min',
+                              filled: true,
+                              fillColor: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              prefixText: '₹ ',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'higher range',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode ? Colors.white38 : Colors.grey.shade500,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _maxFeesController,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: isDarkMode ? Colors.white : AppTheme.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: 'Max',
+                              filled: true,
+                              fillColor: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                              prefixText: '₹ ',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

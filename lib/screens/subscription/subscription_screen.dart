@@ -208,8 +208,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   // Green theme color
-  static const Color _themeGreen = Color(0xFF2E7D32);
-  static const Color _themeGreenLight = Color(0xFF4CAF50);
+  static const Color _themeGreen = Color(0xFF43A047);
+  static const Color _themeGreenLight = Color(0xFF66BB6A);
 
   @override
   Widget build(BuildContext context) {
@@ -396,10 +396,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             'Direct chat access from search results'),
                         _buildFeatureItem('Real-time notifications'),
                         _buildFeatureItem('Priority support'),
-                        _buildFeatureItem(
-                            'Appear higher in search results'),
-                        _buildFeatureItem(
-                            'Access to premium teacher/student profiles'),
                         const SizedBox(height: 20),
 
                         // Payment security info
@@ -500,7 +496,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ),
                 ),
 
-                // Sticky Action Button at bottom
+                // Sticky Action Button at bottom — only for non-premium users
+                if (!_isPremium)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -524,11 +521,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           borderRadius: BorderRadius.circular(15),
                         ),
                       ),
-                      child: Text(
-                        _isPremium
-                            ? 'Renew Premium (₹49)'
-                            : 'Buy Premium – ₹49',
-                        style: const TextStyle(
+                      child: const Text(
+                        'Buy Premium – ₹49',
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
