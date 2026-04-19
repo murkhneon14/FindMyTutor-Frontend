@@ -45,6 +45,15 @@ class _ExploreScreenState extends State<ExploreScreen>
   int _currentBannerPage = 0;
   int _unreadNotificationCount = 0;
   List<Map<String, dynamic>> _liveBanners = [];
+  String? _selectedStateForBanner;
+  final List<String> _indianStates = [
+    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+    'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+    'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+    'Delhi', 'Jammu and Kashmir'
+  ];
 
   final List<Subject> _subjects = [
     Subject(
@@ -341,32 +350,31 @@ class _ExploreScreenState extends State<ExploreScreen>
 
   Future<void> _fetchNearbyBanners() async {
     print('🔄 _fetchNearbyBanners called');
-    print('🔄 _currentLocation: $_currentLocation');
-    if (_currentLocation == null) {
-      print('⚠️ _currentLocation is null — skipping banner fetch');
+    if (_currentLocation == null && _selectedStateForBanner == null) {
+      print('⚠️ Location and state are null — skipping banner fetch');
       return;
     }
-    print('📍 Fetching banners for lat=${_currentLocation!.latitude}, lng=${_currentLocation!.longitude}');
+    
     try {
       final banners = await BannerService.getNearbyBanners(
-        latitude: _currentLocation!.latitude,
-        longitude: _currentLocation!.longitude,
+        latitude: _currentLocation?.latitude,
+        longitude: _currentLocation?.longitude,
+        state: _selectedStateForBanner,
       );
       print('📦 Received ${banners.length} banners from BannerService');
-      if (mounted && banners.isNotEmpty) {
+      if (mounted) {
         setState(() {
           _liveBanners = banners;
         });
-        print('✅ _liveBanners updated with ${_liveBanners.length} banners');
-        // Restart auto-scroll now that we have banners
-        _startAutoScroll();
-        // Track impressions for all visible banners
-        for (final b in banners) {
-          final id = b['_id']?.toString();
-          if (id != null) BannerService.trackImpression(id);
+        if (banners.isNotEmpty) {
+          // Restart auto-scroll now that we have banners
+          _startAutoScroll();
+          // Track impressions for all visible banners
+          for (final b in banners) {
+            final id = b['_id']?.toString();
+            if (id != null) BannerService.trackImpression(id);
+          }
         }
-      } else {
-        print('⚠️ No banners returned or widget not mounted. mounted=$mounted, banners.length=${banners.length}');
       }
     } catch (e) {
       print('❌ Error fetching banners: $e');
@@ -1105,19 +1113,57 @@ class _ExploreScreenState extends State<ExploreScreen>
                             )
                           : Icon(
                               _currentLocation != null
-                                  ? Icons.location_on
-                                  : Icons.location_off,
+                                  ? Icons.my_location
+                                  : Icons.location_disabled,
                             ),
                       onPressed: _getCurrentLocation,
                       color: AppTheme.primaryColor,
                       tooltip: _currentLocation != null
-                          ? 'Location: ${_currentLocation!.latitude.toStringAsFixed(2)}, ${_currentLocation!.longitude.toStringAsFixed(2)}'
+                          ? 'Update Location'
                           : 'Get Location',
                     ),
                   ),
                 ],
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          // State Selection Dropdown
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.primaryColor.withOpacity(0.1)),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _indianStates.contains(_selectedStateForBanner) ? _selectedStateForBanner : null,
+                hint: Row(
+                  children: [
+                    Icon(Icons.location_city, color: AppTheme.primaryColor, size: 20),
+                    const SizedBox(width: 8),
+                    Text('Choose State for Banners', style: TextStyle(color: AppTheme.textSecondary)),
+                  ],
+                ),
+                isExpanded: true,
+                icon: Icon(Icons.keyboard_arrow_down, color: AppTheme.primaryColor),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedStateForBanner = newValue;
+                    });
+                    _fetchNearbyBanners(); // Fetch banners manually when changed
+                  }
+                },
+                items: _indianStates.map<DropdownMenuItem<String>>((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
         ],
       ),

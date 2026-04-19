@@ -3,19 +3,38 @@ import 'package:http/http.dart' as http;
 import '../config/api.dart';
 
 class BannerService {
-  /// Fetch banners near a given location
+  /// Fetch banners for a given state or location
   static Future<List<Map<String, dynamic>>> getNearbyBanners({
-    required double latitude,
-    required double longitude,
-    double radius = 50, // km — search radius for nearby banners
+    double? latitude,
+    double? longitude,
+    String? state,
   }) async {
     try {
+      String? userState = state;
+
+      // Reverse geocode in app to reduce backend load and ensure state is found 
+      if (userState == null && latitude != null && longitude != null) {
+        try {
+          final geoUrl = 'https://nominatim.openstreetmap.org/reverse?lat=$latitude&lon=$longitude&format=json';
+          final geoRes = await http.get(Uri.parse(geoUrl));
+          if (geoRes.statusCode == 200) {
+            final geoData = jsonDecode(geoRes.body);
+            userState = geoData['address']?['state'];
+            print('🌐 Flutter Geocoded State: $userState');
+          }
+        } catch (e) {
+          print('❌ Flutter Geocoding error: $e');
+        }
+      }
+
       final url = ApiConfig.bannersNearby;
-      final body = jsonEncode({
-        'latitude': latitude,
-        'longitude': longitude,
-        'radius': radius,
-      });
+      
+      final requestPayload = <String, dynamic>{};
+      if (latitude != null) requestPayload['latitude'] = latitude;
+      if (longitude != null) requestPayload['longitude'] = longitude;
+      if (userState != null) requestPayload['state'] = userState;
+      
+      final body = jsonEncode(requestPayload);
 
       print('🎯 ========== BANNER API CALL ==========');
       print('🎯 URL: $url');
