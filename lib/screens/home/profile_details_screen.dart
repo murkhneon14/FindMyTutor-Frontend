@@ -47,6 +47,39 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
 
   String? _selectedGender;
   DateTime? _selectedDob;
+  List<String> _selectedSubjects = [];
+  final List<String> _subjects = [
+    'Mathematics',
+    'Science',
+    'English',
+    'History',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Computer Science',
+    'Economics',
+    'Business Studies',
+    'Geography',
+    'Hindi',
+    'Political Science',
+    'Accountancy',
+    'Baking Lessons',
+    'Music Lessons',
+  ];
+  final List<String> _experienceOptions = [
+    'Beginner',
+    '1+',
+    '2+',
+    '3+',
+    '4+',
+    '5+',
+    '6+',
+    '7+',
+    '8+',
+    '9+',
+    '10+',
+    '10+ above'
+  ];
 
   @override
   void initState() {
@@ -85,7 +118,18 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     final teacherProfile = _userData['teacherProfile'] as Map<String, dynamic>?;
     _qualificationsController = TextEditingController(text: teacherProfile?['qualifications']?.toString() ?? '');
     _experienceController = TextEditingController(text: teacherProfile?['experience']?.toString() ?? '');
-    _subjectsController = TextEditingController(text: _formatSubjects(teacherProfile?['subjects']));
+    
+    // Parse subjects into _selectedSubjects list
+    final subjectsRaw = teacherProfile?['subjects'];
+    if (subjectsRaw != null) {
+      if (subjectsRaw is List) {
+        _selectedSubjects = subjectsRaw.map((e) => e.toString()).toList();
+      } else if (subjectsRaw is String) {
+        _selectedSubjects = subjectsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
+    _subjectsController = TextEditingController(text: _selectedSubjects.join(', '));
+    
     _feesController = TextEditingController(text: teacherProfile?['fees']?.toString() ?? '');
     
     // Initialize fee range controllers
@@ -590,7 +634,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                               label: 'Subjects',
                               controller: _subjectsController,
                               enabled: _isEditing,
-                              hint: 'e.g., Mathematics, Physics',
+                              hint: 'Tap to select subjects',
+                              readOnly: true,
+                              onTap: _isEditing ? () => _showMultiSubjectPicker(context) : null,
                             ),
                             _buildDivider(),
                             _buildEditableField(
@@ -605,7 +651,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                               label: 'Years of Experience',
                               controller: _experienceController,
                               enabled: _isEditing,
-                              keyboardType: TextInputType.number,
+                              hint: 'Tap to select experience',
+                              readOnly: true,
+                              onTap: _isEditing ? () => _showExperiencePicker(context) : null,
                             ),
                             _buildDivider(),
                             if (_isEditing)
@@ -866,6 +914,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     int maxLines = 1,
     String? hint,
     String? Function(String?)? validator,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
@@ -905,6 +955,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                 TextFormField(
                   controller: controller,
                   enabled: enabled,
+                  readOnly: readOnly,
+                  onTap: onTap,
                   keyboardType: keyboardType,
                   maxLines: maxLines,
                   validator: validator,
@@ -1483,6 +1535,249 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
           ),
         ],
       ),
+    );
+  }
+
+  void _showExperiencePicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildPickerSheet(
+        'Select Experience',
+        _experienceOptions,
+        _experienceController.text,
+      ),
+    );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _experienceController.text = selected;
+      });
+    }
+  }
+
+  Widget _buildPickerSheet(String title, List<String> items, String selected) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode 
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.white24 : Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 300,
+            child: ListView.builder(
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                final isSelected = item == selected;
+                return ListTile(
+                  title: Text(
+                    item,
+                    style: TextStyle(
+                      color: isSelected
+                          ? AppTheme.primaryColor
+                          : isDarkMode
+                              ? Colors.white
+                              : AppTheme.textPrimary,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                  ),
+                  trailing: isSelected
+                      ? Icon(
+                          Icons.check_circle,
+                          color: AppTheme.primaryColor,
+                        )
+                      : null,
+                  onTap: () => Navigator.pop(context, item),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMultiSubjectPicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<List<String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildMultiPickerSheet(
+        'Select Subjects',
+        _subjects,
+        _selectedSubjects,
+      ),
+    );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedSubjects = selected;
+        _subjectsController.text = _selectedSubjects.join(', ');
+      });
+    }
+  }
+
+  Widget _buildMultiPickerSheet(String title, List<String> items, List<String> selectedItems) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    List<String> tempSelected = List.from(selectedItems);
+    
+    return StatefulBuilder(
+      builder: (context, setModalState) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode 
+                    ? Colors.black.withOpacity(0.3)
+                    : Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, -5),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.fromLTRB(
+            20, 20, 20, 20 + MediaQuery.of(context).padding.bottom,
+          ),
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? Colors.white24 : Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      setModalState(() {
+                        tempSelected.clear();
+                      });
+                    },
+                    child: const Text('Clear All'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (tempSelected.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${tempSelected.length} selected',
+                    style: const TextStyle(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    final isSelected = tempSelected.contains(item);
+                    return CheckboxListTile(
+                      title: Text(
+                        item,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                        ),
+                      ),
+                      value: isSelected,
+                      activeColor: AppTheme.primaryColor,
+                      onChanged: (bool? value) {
+                        setModalState(() {
+                          if (value == true) {
+                            tempSelected.add(item);
+                          } else {
+                            tempSelected.remove(item);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, tempSelected),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Done (${tempSelected.length} selected)',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

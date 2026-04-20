@@ -1230,9 +1230,9 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                RichText(
-                  text: const TextSpan(
-                    style: TextStyle(fontSize: 13, height: 1.6, color: Colors.black87),
+                Text.rich(
+                  const TextSpan(
+                    style: TextStyle(fontSize: 13, height: 1.5),
                     children: [
                       TextSpan(
                         text: 'To make quality education accessible and connect students with trusted tutors nearby. We are committed to empowering teachers by providing a platform that promotes ',
@@ -1278,7 +1278,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const SizedBox(height: 10),
                 const Text(
                   'We strive to build a system where education is not limited by location, time, or resources, but is driven by accessibility, innovation, and trust.',
-                  style: TextStyle(fontSize: 13, height: 1.6),
+                  style: TextStyle(fontSize: 13, height: 1.5),
                 ),
                 const SizedBox(height: 16),
                 const Divider(),

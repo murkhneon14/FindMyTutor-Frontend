@@ -224,11 +224,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               color: Theme.of(context).scaffoldBackgroundColor,
               padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomPadding),
               child: SizedBox(
-                height: 55,
+                width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _buyPremium,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _themeGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),

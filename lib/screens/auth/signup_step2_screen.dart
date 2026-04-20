@@ -67,6 +67,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     'Hindi',
     'Political Science',
     'Accountancy',
+    'Baking Lessons',
+    'Music Lessons',
   ];
   final List<String> _grades = [
     'Pre-School',
