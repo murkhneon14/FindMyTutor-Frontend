@@ -202,9 +202,7 @@ class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
                             ),
                             title: Text(
                               (!_isPremium && n.chatId != null) 
-                                  ? (n.title.startsWith('Message from ') 
-                                      ? n.title.replaceAll('Message from ', '') 
-                                      : n.title)
+                                  ? "New Message"
                                   : n.title,
                               style: TextStyle(
                                 fontWeight:
@@ -214,7 +212,7 @@ class _NotificationsBottomSheetState extends State<NotificationsBottomSheet> {
                             ),
                             subtitle: Text(
                               (!_isPremium && n.chatId != null)
-                                  ? "wants to send you a message. Tap to subscribe."
+                                  ? "Someone is trying to send you a message. Tap to subscribe."
                                   : n.body,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
