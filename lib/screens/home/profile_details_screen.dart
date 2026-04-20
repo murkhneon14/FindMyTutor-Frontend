@@ -44,9 +44,30 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
   late TextEditingController _bioController;
   late TextEditingController _minFeesController;
   late TextEditingController _maxFeesController;
+  late TextEditingController _preferredClassesController;
 
   String? _selectedGender;
   DateTime? _selectedDob;
+  List<String> _selectedGrades = [];
+  List<String> _selectedPreferredClasses = [];
+  final List<String> _grades = [
+    'Pre-School',
+    '1st Grade',
+    '2nd Grade',
+    '3rd Grade',
+    '4th Grade',
+    '5th Grade',
+    '6th Grade',
+    '7th Grade',
+    '8th Grade',
+    '9th Grade',
+    '10th Grade',
+    '11th Grade',
+    '12th Grade',
+    'BA',
+    'B.COM',
+    'B.Sc',
+  ];
   List<String> _selectedSubjects = [];
   final List<String> _subjects = [
     'Mathematics',
@@ -108,7 +129,17 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     
     // Student profile data
     final studentProfile = _userData['studentProfile'] as Map<String, dynamic>?;
-    _classGradeController = TextEditingController(text: studentProfile?['classGrade']?.toString() ?? '');
+    
+    // Parse classGrade into _selectedGrades list
+    final gradesRaw = studentProfile?['classGrade'];
+    if (gradesRaw != null) {
+      if (gradesRaw is List) {
+        _selectedGrades = gradesRaw.map((e) => e.toString()).toList();
+      } else if (gradesRaw is String) {
+        _selectedGrades = gradesRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
+    _classGradeController = TextEditingController(text: _selectedGrades.join(', '));
     _schoolNameController = TextEditingController(text: studentProfile?['schoolName']?.toString() ?? '');
     _guardianNameController = TextEditingController(text: studentProfile?['guardianName']?.toString() ?? '');
     _learningGoalsController = TextEditingController(text: studentProfile?['learningGoals']?.toString() ?? '');
@@ -119,7 +150,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     _qualificationsController = TextEditingController(text: teacherProfile?['qualifications']?.toString() ?? '');
     _experienceController = TextEditingController(text: teacherProfile?['experience']?.toString() ?? '');
     
-    // Parse subjects into _selectedSubjects list
     final subjectsRaw = teacherProfile?['subjects'];
     if (subjectsRaw != null) {
       if (subjectsRaw is List) {
@@ -129,6 +159,17 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
       }
     }
     _subjectsController = TextEditingController(text: _selectedSubjects.join(', '));
+    
+    // Parse preferred classes
+    final prefClassesRaw = teacherProfile?['preferredClasses'];
+    if (prefClassesRaw != null) {
+      if (prefClassesRaw is List) {
+        _selectedPreferredClasses = prefClassesRaw.map((e) => e.toString()).toList();
+      } else if (prefClassesRaw is String) {
+        _selectedPreferredClasses = prefClassesRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
+    _preferredClassesController = TextEditingController(text: _selectedPreferredClasses.join(', '));
     
     _feesController = TextEditingController(text: teacherProfile?['fees']?.toString() ?? '');
     
@@ -176,6 +217,7 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     _qualificationsController.dispose();
     _experienceController.dispose();
     _subjectsController.dispose();
+    _preferredClassesController.dispose();
     _feesController.dispose();
     _timingsController.dispose();
     _bioController.dispose();
@@ -226,7 +268,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
           'dob': _selectedDob?.toIso8601String(),
           'qualifications': _qualificationsController.text.trim(),
           'experience': _experienceController.text.trim(),
-          'subjects': _subjectsController.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
+          'subjects': _selectedSubjects,
+          'preferredClasses': _selectedPreferredClasses,
           'fees': int.tryParse(_feesController.text.trim()) ?? 0,
           'minFees': int.tryParse(_minFeesController.text.trim()) ?? 500,
           'maxFees': int.tryParse(_maxFeesController.text.trim()) ?? 10000,
@@ -640,6 +683,16 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                             ),
                             _buildDivider(),
                             _buildEditableField(
+                              icon: Icons.class_,
+                              label: 'Preferred Classes',
+                              controller: _preferredClassesController,
+                              enabled: _isEditing,
+                              hint: 'Tap to select preferred classes',
+                              readOnly: true,
+                              onTap: _isEditing ? () => _showPreferredClassesPicker(context) : null,
+                            ),
+                            _buildDivider(),
+                            _buildEditableField(
                               icon: Icons.school,
                               label: 'Qualifications',
                               controller: _qualificationsController,
@@ -679,15 +732,15 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                         const SizedBox(height: 16),
                         _buildEditableCard(
                           children: [
-                            if (_isEditing)
-                              _buildClassGradeSelector()
-                            else
-                              _buildEditableField(
-                                icon: Icons.class_,
-                                label: 'Class / Grade',
-                                controller: _classGradeController,
-                                enabled: false,
-                              ),
+                            _buildEditableField(
+                              icon: Icons.class_,
+                              label: 'Class / Grade',
+                              controller: _classGradeController,
+                              enabled: _isEditing,
+                              hint: 'Tap to select class/grade',
+                              readOnly: true,
+                              onTap: _isEditing ? () => _showMultiGradePicker(context) : null,
+                            ),
                             _buildDivider(),
                             _buildEditableField(
                               icon: Icons.business,
@@ -1233,105 +1286,24 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     );
   }
 
-  Widget _buildClassGradeSelector() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final classGrades = [
-      '1st',
-      '2nd',
-      '3rd',
-      '4th',
-      '5th',
-      '6th',
-      '7th',
-      '8th',
-      '9th',
-      '10th',
-      '11th',
-      '12th',
-      'Bachelor\'s',
-    ];
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? Colors.white.withOpacity(0.1)
-                  : AppTheme.primaryColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.class_,
-              color: isDarkMode ? Colors.white70 : AppTheme.primaryColor,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Class / Grade',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                DropdownButtonFormField<String>(
-                  value: _classGradeController.text.isEmpty 
-                      ? null 
-                      : classGrades.contains(_classGradeController.text) 
-                          ? _classGradeController.text 
-                          : null,
-                  hint: Text(
-                    'Select your class',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
-                    ),
-                  ),
-                  icon: Icon(
-                    Icons.arrow_drop_down,
-                    color: isDarkMode ? Colors.white30 : Colors.grey.shade400,
-                  ),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: isDarkMode ? Colors.white : AppTheme.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                    filled: true,
-                    fillColor: isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
-                  ),
-                  dropdownColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
-                  items: classGrades.map((String grade) {
-                    return DropdownMenuItem<String>(
-                      value: grade,
-                      child: Text(grade),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    if (newValue != null) {
-                      setState(() {
-                        _classGradeController.text = newValue;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        ],
+  void _showMultiGradePicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<List<String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildMultiPickerSheet(
+        'Select Class/Grade',
+        _grades,
+        _selectedGrades,
       ),
     );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedGrades = selected;
+        _classGradeController.text = _selectedGrades.join(', ');
+      });
+    }
   }
 
   Widget _buildPremiumStatus() {
@@ -1779,6 +1751,26 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
         );
       },
     );
+  }
+
+  void _showPreferredClassesPicker(BuildContext context) async {
+    final selected = await showModalBottomSheet<List<String>>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _buildMultiPickerSheet(
+        'Select Preferred Classes',
+        _grades,
+        _selectedPreferredClasses,
+      ),
+    );
+    
+    if (selected != null && mounted) {
+      setState(() {
+        _selectedPreferredClasses = selected;
+        _preferredClassesController.text = _selectedPreferredClasses.join(', ');
+      });
+    }
   }
 
   String _capitalizeFirst(String s) {
