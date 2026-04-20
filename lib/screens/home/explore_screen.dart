@@ -2431,27 +2431,6 @@ class _ExploreScreenState extends State<ExploreScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.currency_rupee_rounded,
-                  size: 16,
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  minFees != null && maxFees != null
-                      ? '₹$minFees - ₹$maxFees / month'
-                      : '₹${fees.toInt()} / month',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.primaryColor,
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

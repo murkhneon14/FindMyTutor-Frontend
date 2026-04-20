@@ -1492,11 +1492,9 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
   }
 
   String _formatDate(DateTime date) {
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
   }
 
   String _formatDateTime(dynamic dateTime) {

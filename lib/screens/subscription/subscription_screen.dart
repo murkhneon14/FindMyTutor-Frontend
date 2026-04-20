@@ -213,11 +213,38 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Premium Subscription'),
         backgroundColor: _themeGreen,
       ),
+      bottomNavigationBar: (!_isPremium && !_isLoading)
+          ? Container(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomPadding),
+              child: SizedBox(
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: _buyPremium,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _themeGreen,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  child: const Text(
+                    'Buy Premium – ₹49',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _themeGreen))
           : Column(
@@ -492,43 +519,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           ),
                         ],
                       ],
-                    ),
-                  ),
-                ),
-
-                // Sticky Action Button at bottom — only for non-premium users
-                if (!_isPremium)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 8,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: SizedBox(
-                    height: 55,
-                    child: ElevatedButton(
-                      onPressed: _buyPremium,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _themeGreen,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: const Text(
-                        'Buy Premium – ₹49',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
                     ),
                   ),
                 ),

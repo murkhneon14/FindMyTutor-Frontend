@@ -38,8 +38,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   final _emailController = TextEditingController(); // Optional email
   final _addressController = TextEditingController();
   final _bioController = TextEditingController();
-  final _minFeesController = TextEditingController(text: '500');
-  final _maxFeesController = TextEditingController(text: '10000');
+  final _minFeesController = TextEditingController();
+  final _maxFeesController = TextEditingController();
+  final _dobController = TextEditingController();
   
   bool _isLoading = false;
   bool _isTeacher = false;
@@ -50,6 +51,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   String? _locationError;
   List<String> _selectedSubjects = [];
   List<String> _selectedPreferredClasses = [];
+  List<String> _selectedGrades = [];
   final List<String> _subjects = [
     'Mathematics',
     'Science',
@@ -105,6 +107,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     _bioController.dispose();
     _minFeesController.dispose();
     _maxFeesController.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 
@@ -136,6 +139,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     if (picked != null && picked != _selectedDob) {
       setState(() {
         _selectedDob = picked;
+        _dobController.text =
+            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
       });
     }
   }
@@ -252,13 +257,24 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
             return;
           }
 
+          if (_selectedGrades.isEmpty) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please select at least one class/grade'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
           // Student profile with location
           final studentData = {
             'phone': widget.phone, // Already verified
             'email': _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
             'dob': _selectedDob?.toIso8601String(),
             'gender': (_selectedGender ?? '').toLowerCase(),
-            'classGrade': _gradeController.text.trim(),
+            'classGrade': _selectedGrades.join(', '),
             'schoolName': _instituteController.text.trim(),
             'guardianName': _guardianNameController.text.trim().isEmpty ? null : _guardianNameController.text.trim(),
             'learningGoals': _bioController.text.trim().isEmpty ? null : _bioController.text.trim(),
@@ -485,45 +501,68 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          GestureDetector(
-                            onTap: () => _selectDate(context),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 18,
+                          TextFormField(
+                            controller: _dobController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 10,
+                            inputFormatters: [_DateInputFormatter()],
+                            decoration: InputDecoration(
+                              hintText: 'dd/mm/yyyy',
+                              counterText: '',
+                              prefixIcon: Icon(
+                                Icons.calendar_today_outlined,
+                                color: AppTheme.primaryColor,
+                                size: 20,
                               ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
+                              suffixIcon: IconButton(
+                                icon: Icon(Icons.edit_calendar_outlined,
+                                    color: AppTheme.primaryColor),
+                                onPressed: () => _selectDate(context),
+                                tooltip: 'Pick from calendar',
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                                borderSide: BorderSide.none,
                               ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.calendar_today_outlined,
-                                    color: AppTheme.primaryColor,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _selectedDob != null
-                                        ? '${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}'
-                                        : 'Select your date of birth',
-                                    style: TextStyle(
-                                      color: _selectedDob != null
-                                          ? AppTheme.textPrimary
-                                          : Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                    color: Colors.grey.shade200),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                    color: AppTheme.primaryColor),
                               ),
                             ),
+                            onChanged: (val) {
+                              if (val.length == 10) {
+                                final parts = val.split('/');
+                                if (parts.length == 3) {
+                                  final d = int.tryParse(parts[0]);
+                                  final m = int.tryParse(parts[1]);
+                                  final y = int.tryParse(parts[2]);
+                                  if (d != null && m != null && y != null) {
+                                    try {
+                                      final date = DateTime(y, m, d);
+                                      if (date.isBefore(DateTime.now())) {
+                                        setState(() => _selectedDob = date);
+                                      }
+                                    } catch (_) {}
+                                  }
+                                }
+                              } else {
+                                setState(() => _selectedDob = null);
+                              }
+                            },
+                            validator: (val) {
+                              if (_selectedDob == null) {
+                                return 'Please enter a valid date of birth (dd/mm/yyyy)';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 20),
                           
@@ -595,12 +634,12 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             
                             _buildTextField(
                               controller: _instituteController,
-                              label: 'School/Institute Name',
-                              hint: 'Enter your school or institute name',
+                              label: _isTeacher ? 'Qualification' : 'School/Institute Name',
+                              hint: _isTeacher ? 'Enter your qualification' : 'Enter your school or institute name',
                               icon: Icons.school_outlined,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please enter your school/institute name';
+                                  return _isTeacher ? 'Please enter your qualification' : 'Please enter your school/institute name';
                                 }
                                 return null;
                               },
@@ -723,19 +762,12 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             ),
                           ] else ...[
                             // Student/Parent Specific Fields
-                            _buildTextField(
-                              controller: _gradeController,
+                            _buildMultiSelectField(
                               label: 'Class/Grade',
-                              hint: 'Select your class/grade',
+                              hint: 'Tap to select your class/grade',
                               icon: Icons.school_outlined,
-                              readOnly: true,
+                              selectedItems: _selectedGrades,
                               onTap: () => _showGradePicker(context),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please select your class/grade';
-                                }
-                                return null;
-                              },
                             ),
                             const SizedBox(height: 20),
                             
@@ -1337,19 +1369,20 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   }
 
   void _showGradePicker(BuildContext context) async {
-    final selected = await showModalBottomSheet<String>(
+    final selected = await showModalBottomSheet<List<String>>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildPickerSheet(
+      isScrollControlled: true,
+      builder: (context) => _buildMultiPickerSheet(
         'Select Grade/Class',
         _grades,
-        _gradeController.text,
+        _selectedGrades,
       ),
     );
-    
+
     if (selected != null && mounted) {
       setState(() {
-        _gradeController.text = selected;
+        _selectedGrades = selected;
       });
     }
   }
@@ -1489,7 +1522,9 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
               ),
             ],
           ),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(
+            20, 20, 20, 20 + MediaQuery.of(context).padding.bottom,
+          ),
           height: MediaQuery.of(context).size.height * 0.7,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1699,6 +1734,28 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Automatically inserts '/' after dd and dd/mm while the user types digits.
+class _DateInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.replaceAll('/', '');
+    if (text.length > 8) return oldValue;
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 1 || i == 3) buffer.write('/');
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

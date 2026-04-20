@@ -1061,50 +1061,55 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 Expanded(
                   flex: 2,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SubscriptionScreen(),
-                        ),
-                      ).then((_) => _bootstrap());
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2196F3), Color(0xFF1565C0)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
-                      elevation: 6,
-                      shadowColor: const Color(0xFF2196F3).withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2196F3).withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: Ink(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF2196F3), Color(0xFF1565C0)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SubscriptionScreen(),
+                          ),
+                        ).then((_) => _bootstrap());
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Upgrade Now',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Upgrade Now',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
-                            SizedBox(width: 8),
-                            Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                          ],
-                        ),
+                          ),
+                          SizedBox(width: 6),
+                          Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+                        ],
                       ),
                     ),
                   ),
@@ -1208,7 +1213,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   style: TextStyle(fontSize: 13, height: 1.5),
                 ),
                 const SizedBox(height: 16),
-                // Our Mission
+                // Mission
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
@@ -1216,7 +1221,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Our Mission',
+                    'Mission',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -1225,12 +1230,36 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'To provide reliable and accessible tutoring services while empowering educators to inspire, guide, and support student success.',
-                  style: TextStyle(fontSize: 13, height: 1.5),
+                RichText(
+                  text: const TextSpan(
+                    style: TextStyle(fontSize: 13, height: 1.6, color: Colors.black87),
+                    children: [
+                      TextSpan(
+                        text: 'To make quality education accessible and connect students with trusted tutors nearby. We are committed to empowering teachers by providing a platform that promotes ',
+                      ),
+                      TextSpan(
+                        text: 'freelancing opportunities',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      TextSpan(
+                        text: ', financial independence, and professional growth\u2014allowing educators to teach with flexibility and purpose.\n\nWith a vision of ',
+                      ),
+                      TextSpan(
+                        text: '\u201cHar Ghar Education\u201d',
+                        style: TextStyle(fontStyle: FontStyle.italic),
+                      ),
+                      TextSpan(
+                        text: ', we aim to bring learning to every home and create equal opportunities for all. Together, we are building a future where ',
+                      ),
+                      TextSpan(
+                        text: 'every student finds the right guide, and every teacher finds the right platform.',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
-                // Our Vision
+                // Vision
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
@@ -1238,7 +1267,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Our Vision',
+                    'Vision',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -1248,8 +1277,8 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'To become a trusted educational network that connects learners and educators, strengthening communities through accessible and quality education.',
-                  style: TextStyle(fontSize: 13, height: 1.5),
+                  'We strive to build a system where education is not limited by location, time, or resources, but is driven by accessibility, innovation, and trust.',
+                  style: TextStyle(fontSize: 13, height: 1.6),
                 ),
                 const SizedBox(height: 16),
                 const Divider(),
