@@ -48,7 +48,7 @@ class GlobalNotificationManager {
         // Listen for new messages (only set up once)
         if (!_isInitialized) {
           print('🔔 Setting up message stream listener...');
-          _socketService.messageStream.listen((data) {
+          _socketService.messageStream.listen((data) async {
             print('🔔 ========== Message received in stream ==========');
             print('🔔 Message received in stream: $data');
             try {
@@ -70,11 +70,17 @@ class GlobalNotificationManager {
               if (message.senderId != _currentUserId && chatId != _currentChatId) {
                 print('🔔 ✅ Conditions met - Showing notification for message from ${message.senderName}');
 
+                final subscriptionService = SubscriptionService();
+                final isPremium = await subscriptionService.isPremiumUser();
+                
+                final displayTitle = isPremium ? message.senderName : "New Message";
+                final displayMessage = isPremium ? message.text : "Someone is trying to send you a message. Tap to subscribe.";
+
                 // Save to notification storage
                 NotificationStorageService.addNotification(NotificationItem(
                   id: 'msg_${message.id}_${DateTime.now().millisecondsSinceEpoch}',
-                  title: message.senderName,
-                  body: message.text,
+                  title: displayTitle,
+                  body: displayMessage,
                   createdAt: DateTime.now(),
                   chatId: chatId,
                   senderId: message.senderId,
@@ -92,8 +98,8 @@ class GlobalNotificationManager {
                   print('🔔 ✅ Context is valid and mounted - Calling NotificationService');
                   NotificationService.showMessageNotification(
                     context: notificationContext,
-                    senderName: message.senderName,
-                    message: message.text,
+                    senderName: displayTitle,
+                    message: displayMessage,
                     onTap: () async {
                       print('🔔 Notification tapped');
                       // Check if user is premium before navigating to chat
@@ -154,7 +160,7 @@ class GlobalNotificationManager {
           print('🔔 Message stream listener set up successfully');
 
           // Listen for chat updates (fallback if newMessage events don't work)
-          _socketService.chatUpdateStream.listen((data) {
+          _socketService.chatUpdateStream.listen((data) async {
             print('🔔 Chat update received: $data');
             // Check if this is a new message (unread count increased)
             final unreadCount = data['unreadCount'] as int? ?? 0;
@@ -181,11 +187,15 @@ class GlobalNotificationManager {
               // Update last notified count
               _lastNotifiedUnreadCount[chatId] = unreadCount;
 
+              final subscriptionService = SubscriptionService();
+              final isPremium = await subscriptionService.isPremiumUser();
+              final displayMessage = isPremium ? lastMessage : "Someone is trying to send you a message. Tap to subscribe.";
+
               // Save to notification storage
               NotificationStorageService.addNotification(NotificationItem(
                 id: 'chat_${chatId}_${DateTime.now().millisecondsSinceEpoch}',
                 title: 'New Message',
-                body: lastMessage,
+                body: displayMessage,
                 createdAt: DateTime.now(),
                 chatId: chatId,
                 type: 'chat',
@@ -197,7 +207,7 @@ class GlobalNotificationManager {
                 NotificationService.showMessageNotification(
                   context: notificationContext,
                   senderName: 'New Message',
-                  message: lastMessage,
+                  message: displayMessage,
                   onTap: () async {
                     print('🔔 Chat update notification tapped');
                     final subscriptionService = SubscriptionService();
