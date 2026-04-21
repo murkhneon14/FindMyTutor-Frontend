@@ -1684,6 +1684,8 @@ class _ExploreScreenState extends State<ExploreScreen>
                         'BA',
                         'B.COM',
                         'B.Sc',
+                        'Baking Lessons',
+                        'Music Lessons',
                       ];
 
                       return InkWell(

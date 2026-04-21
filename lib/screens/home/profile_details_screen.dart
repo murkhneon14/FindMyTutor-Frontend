@@ -67,6 +67,8 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
     'BA',
     'B.COM',
     'B.Sc',
+    'Baking Lessons',
+    'Music Lessons',
   ];
   List<String> _selectedSubjects = [];
   final List<String> _subjects = [
