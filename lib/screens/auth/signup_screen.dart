@@ -74,6 +74,22 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
 
     final phone = _phoneController.text.trim();
+    final normalizedPhone = phone.startsWith('+') ? phone : '+91$phone';
+
+    // Check if phone exists in our system
+    final checkResult = await _authService.checkPhoneExists(normalizedPhone);
+    
+    if (checkResult['exists'] == true) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone number already registered. Please log in instead.'),
+          ),
+        );
+      }
+      return;
+    }
 
     // Send OTP via backend (Message Central)
     final result = await _authService.sendOTP(phoneNumber: phone);
