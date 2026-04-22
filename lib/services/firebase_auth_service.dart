@@ -263,14 +263,23 @@ class FirebaseAuthService {
       await _auth.signOut();
       
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-      await prefs.remove('user_id');
-      await prefs.remove('user_name');
-      await prefs.remove('user_phone');
-      await prefs.remove('user_email');
-      await prefs.remove('user_role');
       
-      debugPrint('User signed out successfully');
+      // Save non-user preferences
+      final isDarkMode = prefs.getBool('isDarkMode');
+      final hasCompletedOnboarding = prefs.getBool('hasCompletedOnboarding');
+      
+      // Clear all cached data completely
+      await prefs.clear();
+      
+      // Restore non-user preferences
+      if (isDarkMode != null) {
+        await prefs.setBool('isDarkMode', isDarkMode);
+      }
+      if (hasCompletedOnboarding != null) {
+        await prefs.setBool('hasCompletedOnboarding', hasCompletedOnboarding);
+      }
+      
+      debugPrint('User signed out completely');
     } catch (e) {
       debugPrint('Sign out error: $e');
     }
