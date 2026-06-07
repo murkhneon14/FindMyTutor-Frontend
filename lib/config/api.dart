@@ -54,7 +54,9 @@ class ApiConfig {
       '$baseUrl/api/auth/teacher-profile/$id';
   static String studentProfileById(String id) =>
       '$baseUrl/api/auth/student-profile/$id';
-  static String get updateLocation => '$baseUrl/api/auth/update-location';
+  static String get updateLocation => '$baseUrl/api/auth/update-location'; // legacy
+  static String get updateTeacherLocation => '$baseUrl/api/auth/update-teacher-location';
+  static String get updateStudentLocation => '$baseUrl/api/auth/update-student-location';
 
   // Chat endpoints
   static String get chatBase => '$baseUrl/api/chat';

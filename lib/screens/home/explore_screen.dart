@@ -16,6 +16,7 @@ import 'notifications_bottom_sheet.dart';
 import '../../services/notification_storage_service.dart';
 import '../../services/banner_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../widgets/location_drift_banner.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -48,6 +49,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   int _unreadNotificationCount = 0;
   List<Map<String, dynamic>> _liveBanners = [];
   String? _selectedStateForBanner;
+  List<dynamic>? _storedProfileCoordinates; // GeoJSON [lon, lat] from profile
   final List<String> _indianStates = [
     'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
     'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
@@ -227,6 +229,20 @@ class _ExploreScreenState extends State<ExploreScreen>
               teacherProfile is Map &&
               teacherProfile.isNotEmpty) {
             userRole = 'teacher';
+            // Extract stored location coordinates for drift check
+            final coords = teacherProfile['location']?['coordinates'];
+            if (coords is List && coords.length == 2) {
+              if (mounted) setState(() => _storedProfileCoordinates = coords);
+            }
+          } else {
+            // Student profile
+            final studentProfile = user['studentProfile'];
+            if (studentProfile != null && studentProfile is Map) {
+              final coords = studentProfile['location']?['coordinates'];
+              if (coords is List && coords.length == 2) {
+                if (mounted) setState(() => _storedProfileCoordinates = coords);
+              }
+            }
           }
 
           // Save to SharedPreferences for future use
@@ -1060,6 +1076,12 @@ class _ExploreScreenState extends State<ExploreScreen>
                 child: Column(
                   children: [
                     _buildHeader(),
+                    // Location drift warning banner
+                    if (_storedProfileCoordinates != null && _userRole != null)
+                      LocationDriftBanner(
+                        role: _userRole!,
+                        storedCoordinates: _storedProfileCoordinates!,
+                      ),
                     _buildPromoBanner(),
                     const SizedBox(height: 16),
                     _buildTabBar(),
