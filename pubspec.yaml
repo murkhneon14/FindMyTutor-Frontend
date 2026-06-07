@@ -1,7 +1,7 @@
 name: find_my_tutor
 description: A premium tutor marketplace app connecting students with qualified teachers. Find nearby tutors, book sessions, and learn with expert teachers.
 publish_to: 'none'
-version: 1.0.5+17  # Update version code (+N) for each Play Store upload
+version: 1.0.9+23  # Bump +N versionCode every Play Console upload (AAB replaces previous)
 
 environment:
   sdk: '^3.8.0'
@@ -45,7 +45,7 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/icon.png"
-  min_sdk_android: 21
+  min_sdk_android: 23
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/icon.png"
   remove_alpha_ios: true

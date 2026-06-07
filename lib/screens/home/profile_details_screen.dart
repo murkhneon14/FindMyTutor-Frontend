@@ -652,17 +652,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                               label: 'Gender',
                               value: _selectedGender ?? 'Not specified',
                             ),
-                          _buildDivider(),
-                          if (_isEditing)
-                            _buildDateField()
-                          else
-                            _buildReadOnlyField(
-                              icon: Icons.cake,
-                              label: 'Date of Birth',
-                              value: _selectedDob != null
-                                  ? _formatDate(_selectedDob!)
-                                  : 'Not specified',
-                            ),
                         ],
                       ),
 
@@ -742,20 +731,6 @@ class _ProfileDetailsScreenState extends State<ProfileDetailsScreen>
                               hint: 'Tap to select class/grade',
                               readOnly: true,
                               onTap: _isEditing ? () => _showMultiGradePicker(context) : null,
-                            ),
-                            _buildDivider(),
-                            _buildEditableField(
-                              icon: Icons.business,
-                              label: 'School / College Name',
-                              controller: _schoolNameController,
-                              enabled: _isEditing,
-                            ),
-                            _buildDivider(),
-                            _buildEditableField(
-                              icon: Icons.family_restroom,
-                              label: 'Guardian Name',
-                              controller: _guardianNameController,
-                              enabled: _isEditing,
                             ),
                             _buildDivider(),
                             _buildEditableField(

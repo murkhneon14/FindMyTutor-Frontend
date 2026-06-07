@@ -495,88 +495,13 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                           ),
                           const SizedBox(height: 20),
                           
-                          // Date of Birth
-                          Text(
-                            'Date of Birth',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          TextFormField(
-                            controller: _dobController,
-                            keyboardType: TextInputType.number,
-                            maxLength: 10,
-                            inputFormatters: [_DateInputFormatter()],
-                            decoration: InputDecoration(
-                              hintText: 'dd/mm/yyyy',
-                              counterText: '',
-                              prefixIcon: Icon(
-                                Icons.calendar_today_outlined,
-                                color: AppTheme.primaryColor,
-                                size: 20,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(Icons.edit_calendar_outlined,
-                                    color: AppTheme.primaryColor),
-                                onPressed: () => _selectDate(context),
-                                tooltip: 'Pick from calendar',
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                    color: Colors.grey.shade200),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                    color: AppTheme.primaryColor),
-                              ),
-                            ),
-                            onChanged: (val) {
-                              if (val.length == 10) {
-                                final parts = val.split('/');
-                                if (parts.length == 3) {
-                                  final d = int.tryParse(parts[0]);
-                                  final m = int.tryParse(parts[1]);
-                                  final y = int.tryParse(parts[2]);
-                                  if (d != null && m != null && y != null) {
-                                    try {
-                                      final date = DateTime(y, m, d);
-                                      if (date.isBefore(DateTime.now())) {
-                                        setState(() => _selectedDob = date);
-                                      }
-                                    } catch (_) {}
-                                  }
-                                }
-                              } else {
-                                setState(() => _selectedDob = null);
-                              }
-                            },
-                            validator: (val) {
-                              if (_selectedDob == null) {
-                                return 'Please enter a valid date of birth (dd/mm/yyyy)';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20),
-                          
                           // Gender Selection
                           Text(
                             'Gender',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: AppTheme.textPrimary,
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -656,17 +581,17 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             // Location Section for Teachers
                             Text(
                               'Location',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardColor : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: _currentLocation != null 
@@ -701,7 +626,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                                 fontWeight: FontWeight.w600,
                                                 color: _currentLocation != null 
                                                     ? AppTheme.successColor 
-                                                    : Colors.grey[700],
+                                                    : Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey[700],
                                               ),
                                             ),
                                             if (_currentLocation != null)
@@ -709,7 +634,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                                 'Lat: ${_currentLocation!.latitude.toStringAsFixed(4)}, Lon: ${_currentLocation!.longitude.toStringAsFixed(4)}',
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Colors.grey[600],
+                                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.grey[600],
                                                 ),
                                               ),
                                           ],
@@ -739,7 +664,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                         'Tap refresh to get your location. This helps students find you.',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.grey[600],
                                         ),
                                       ),
                                     ),
@@ -750,19 +675,10 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             
                             _buildTextField(
                               controller: _bioController,
-                              label: 'Bio/Introduction',
+                              label: 'Bio/Introduction (Optional)',
                               hint: 'Tell us about yourself and your teaching style',
                               icon: Icons.info_outline,
                               maxLines: 3,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please write a short bio';
-                                }
-                                if (value.length < 10) {
-                                  return 'Please write at least 10 characters';
-                                }
-                                return null;
-                              },
                             ),
                           ] else ...[
                             // Student/Parent Specific Fields
@@ -775,42 +691,22 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             ),
                             const SizedBox(height: 20),
                             
-                            _buildTextField(
-                              controller: _instituteController,
-                              label: 'School/College Name',
-                              hint: 'Enter your school/college name',
-                              icon: Icons.school_outlined,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your school/college name';
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            
-                            _buildTextField(
-                              controller: _guardianNameController,
-                              label: 'Guardian Name (if under 18)',
-                              hint: 'Enter guardian name',
-                              icon: Icons.person_outline,
-                            ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 0),
                             
                             // Location Section for Students
                             Text(
                               'Location',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: AppTheme.textPrimary,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : AppTheme.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCardColor : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
                                   color: _currentLocation != null 
@@ -845,7 +741,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                                 fontWeight: FontWeight.w600,
                                                 color: _currentLocation != null 
                                                     ? AppTheme.successColor 
-                                                    : Colors.grey[700],
+                                                    : Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey[700],
                                               ),
                                             ),
                                             if (_currentLocation != null)
@@ -853,7 +749,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                                 'Lat: ${_currentLocation!.latitude.toStringAsFixed(4)}, Lon: ${_currentLocation!.longitude.toStringAsFixed(4)}',
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: Colors.grey[600],
+                                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.grey[600],
                                                 ),
                                               ),
                                           ],
@@ -883,7 +779,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                                         'Tap refresh to get your location. This helps teachers find you.',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.grey[600],
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.grey[600],
                                         ),
                                       ),
                                     ),
@@ -894,27 +790,21 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                             
                             _buildTextField(
                               controller: _bioController,
-                              label: 'Learning Goals',
+                              label: 'Learning Goals (Optional)',
                               hint: 'What do you want to achieve with tutoring?',
                               icon: Icons.lightbulb_outline,
                               maxLines: 3,
                             ),
                           ],
                           
-                          // Address
+                          // Address (Optional)
                           const SizedBox(height: 20),
                           _buildTextField(
                             controller: _addressController,
-                            label: 'Address',
+                            label: 'Address (Optional)',
                             hint: 'Enter your full address',
                             icon: Icons.location_on_outlined,
                             maxLines: 2,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your address';
-                              }
-                              return null;
-                            },
                           ),
                           
                           // Terms and Conditions
@@ -1034,17 +924,20 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
 
   Widget _buildGenderOption(String gender, IconData icon) {
     final isSelected = _selectedGender == gender;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () => setState(() => _selectedGender = gender),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.white,
+          color: isSelected 
+              ? AppTheme.primaryColor.withOpacity(0.1) 
+              : isDarkMode ? AppTheme.darkCardColor : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? AppTheme.primaryColor
-                : AppTheme.textSecondary.withOpacity(0.2),
+                : isDarkMode ? Colors.white24 : AppTheme.textSecondary.withOpacity(0.2),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -1053,7 +946,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
+              color: isSelected ? AppTheme.primaryColor : isDarkMode ? Colors.white70 : AppTheme.textSecondary,
               size: 18,
             ),
             const SizedBox(width: 4),
@@ -1061,7 +954,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
               child: Text(
                 gender,
                 style: TextStyle(
-                  color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                  color: isSelected ? AppTheme.primaryColor : isDarkMode ? Colors.white : AppTheme.textPrimary,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   fontSize: 13,
                 ),
@@ -1159,15 +1052,16 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
   }
 
   Widget _buildFeeRangeSelector() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Monthly Fee Range (₹)',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
@@ -1181,23 +1075,33 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                     'lower range',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: isDarkMode ? Colors.white60 : Colors.grey[500],
                     ),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _minFeesController,
                     keyboardType: TextInputType.number,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Min',
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                      ),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.grey[100],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       prefixText: '₹ ',
+                      prefixStyle: TextStyle(
+                        color: isDarkMode ? Colors.white70 : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -1212,23 +1116,33 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                     'higher range',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[500],
+                      color: isDarkMode ? Colors.white60 : Colors.grey[500],
                     ),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _maxFeesController,
                     keyboardType: TextInputType.number,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : AppTheme.textPrimary,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Max',
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.white54 : AppTheme.textSecondary,
+                      ),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.grey[100],
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       prefixText: '₹ ',
+                      prefixStyle: TextStyle(
+                        color: isDarkMode ? Colors.white70 : AppTheme.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -1645,15 +1559,16 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
     required List<String> selectedItems,
     required VoidCallback onTap,
   }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: isDarkMode ? Colors.white : AppTheme.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -1662,11 +1577,13 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDarkMode ? AppTheme.darkCardColor : Colors.white,
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: isDarkMode 
+                      ? Colors.black.withOpacity(0.3)
+                      : Colors.black.withOpacity(0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1688,8 +1605,8 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                         selectedItems.isEmpty ? hint : '${selectedItems.length} selected',
                         style: TextStyle(
                           color: selectedItems.isEmpty
-                              ? Colors.grey[500]
-                              : AppTheme.textPrimary,
+                              ? isDarkMode ? Colors.white54 : Colors.grey[500]
+                              : isDarkMode ? Colors.white : AppTheme.textPrimary,
                           fontWeight: selectedItems.isEmpty
                               ? FontWeight.normal
                               : FontWeight.w600,
@@ -1699,7 +1616,7 @@ class _SignupStep2ScreenState extends State<SignupStep2Screen> {
                     Icon(
                       Icons.arrow_forward_ios,
                       size: 16,
-                      color: Colors.grey[400],
+                      color: isDarkMode ? Colors.white38 : Colors.grey[400],
                     ),
                   ],
                 ),

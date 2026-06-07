@@ -490,10 +490,15 @@ class _AccountScreenState extends State<AccountScreen> {
             // Menu Items (hide Premium upgrade for premium users)
             if (!_isPremium)
               _buildMenuItem(
-                Icons.workspace_premium,
-                'Premium',
-                'Upgrade to unlock premium features',
-                () => _showPremiumDialog(context),
+                Icons.language,
+                'Our website',
+                'FindMyTutor.app',
+                () async {
+                  final url = Uri.parse('https://findmytutor.app');
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  }
+                },
                 isPremium: true,
               ),
             _buildMenuItem(

@@ -2331,16 +2331,36 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
   }
 
+  int? _parseTeacherFee(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is double) return v.round();
+    return int.tryParse(v.toString());
+  }
+
+  /// Shown on search teacher cards instead of subjects.
+  String _teacherPriceRangeLabel(Map<String, dynamic> teacher) {
+    final minF = _parseTeacherFee(teacher['minFees']);
+    final maxF = _parseTeacherFee(teacher['maxFees']);
+    final baseFee = _parseTeacherFee(teacher['fees']);
+
+    if (minF != null && maxF != null) {
+      if (minF == maxF) return '₹$minF';
+      final lo = minF < maxF ? minF : maxF;
+      final hi = minF < maxF ? maxF : minF;
+      return '₹$lo - ₹$hi';
+    }
+    if (minF != null) return 'From ₹$minF';
+    if (maxF != null) return 'Up to ₹$maxF';
+    if (baseFee != null) return '₹$baseFee';
+    return 'Rate on request';
+  }
+
   Widget _buildTeacherCard(Map<String, dynamic> teacher) {
     final user = teacher['userId'] ?? {};
     final name = user['name']?.toString() ?? 'Unknown';
-    final email = user['email']?.toString() ?? '';
-    final subjects = (teacher['subjects'] as List?)?.join(', ') ?? 'N/A';
     final experience = teacher['experience']?.toString() ?? 'N/A';
     final qualifications = teacher['qualifications']?.toString() ?? 'N/A';
-    final minFees = teacher['minFees']?.toInt();
-    final maxFees = teacher['maxFees']?.toInt();
-    final fees = teacher['fees']?.toDouble() ?? 0.0;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
@@ -2396,6 +2416,27 @@ class _ExploreScreenState extends State<ExploreScreen>
               ],
             ),
             const SizedBox(height: 16),
+            Row(
+              children: [
+                Icon(
+                  Icons.payments_outlined,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _teacherPriceRangeLabel(teacher),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(
@@ -2594,11 +2635,19 @@ class _ExploreScreenState extends State<ExploreScreen>
   Widget _buildStudentCard(Map<String, dynamic> student) {
     final user = student['userId'] ?? {};
     final name = user['name']?.toString() ?? 'Unknown';
-    final email = user['email']?.toString() ?? '';
-    final classGrade = student['classGrade']?.toString() ?? 'N/A';
     final schoolName = student['schoolName']?.toString() ?? 'N/A';
     final learningGoals =
         student['learningGoals']?.toString() ?? 'Not specified';
+    final rawAddress =
+        student['address'] ??
+        student['location'] ??
+        student['city'] ??
+        student['district'] ??
+        user['address'];
+    final address =
+        rawAddress?.toString().trim().isNotEmpty == true
+            ? rawAddress.toString().trim()
+            : 'Not specified';
     final guardianName = student['guardianName']?.toString();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -2702,90 +2751,47 @@ class _ExploreScreenState extends State<ExploreScreen>
               ],
             ),
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDarkMode
-                    ? AppTheme.primaryColor.withOpacity(0.1)
-                    : AppTheme.primaryColor.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.school,
-                        size: 16,
-                        color: AppTheme.primaryColor,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Class: $classGrade',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isDarkMode
-                                ? Colors.white
-                                : AppTheme.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.location_city,
-                        size: 16,
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          schoolName,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: isDarkMode
-                                ? Colors.grey[300]
-                                : Colors.grey[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (guardianName != null && guardianName.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.family_restroom,
-                          size: 16,
-                          color: isDarkMode
-                              ? Colors.grey[400]
-                              : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Guardian: $guardianName',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDarkMode
-                                  ? Colors.grey[300]
-                                  : Colors.grey[700],
-                            ),
-                          ),
-                        ),
-                      ],
+            Row(
+              children: [
+                Icon(
+                  Icons.location_city,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    schoolName,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
                     ),
-                  ],
+                  ),
+                ),
+              ],
+            ),
+            if (guardianName != null && guardianName.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.family_restroom,
+                    size: 16,
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Guardian: $guardianName',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
@@ -2798,6 +2804,28 @@ class _ExploreScreenState extends State<ExploreScreen>
                 Expanded(
                   child: Text(
                     'Goals: $learningGoals',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.home_outlined,
+                  size: 16,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Address: $address',
                     style: TextStyle(
                       fontSize: 13,
                       color: isDarkMode ? Colors.grey[300] : Colors.grey[700],

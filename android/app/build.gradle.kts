@@ -10,7 +10,8 @@ plugins {
 
 android {
     namespace = "com.findmytutor.app"
-    compileSdk = flutter.compileSdkVersion
+    // Explicit Play-ready API level (Policy target / compile parity). Keep >= Play requirements.
+    compileSdk = flutter.compileSdkVersion.coerceAtLeast(35)
     ndkVersion = "27.0.12077973"
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -28,7 +29,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 23  // Required for Firebase
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = flutter.targetSdkVersion.coerceAtLeast(35)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
@@ -37,6 +38,9 @@ android {
     // Configure signing from key.properties if available
     val keystorePropertiesFile = rootProject.file("key.properties")
     var useReleaseSigning = false
+    val isReleaseBuildRequested = gradle.startParameter.taskNames.any {
+        it.contains("Release", ignoreCase = true)
+    }
     
     if (keystorePropertiesFile.exists()) {
         try {
@@ -74,12 +78,19 @@ android {
         println("ℹ️ key.properties not found - using debug signing for release")
     }
 
+    // Hard-stop release builds without a real upload key.
+    if (isReleaseBuildRequested && !useReleaseSigning) {
+        throw GradleException(
+            "Release signing is not configured. Create android/key.properties from android/key.properties.example and set a valid .jks file before building release."
+        )
+    }
+
     buildTypes {
         release {
-            // Only attach signing config if keystore file exists and is valid
             if (useReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            isDebuggable = false
             // Enable code shrinking and obfuscation for release
             isMinifyEnabled = true
             isShrinkResources = true
@@ -92,8 +103,9 @@ android {
 
     packaging {
         jniLibs {
+            // Legacy packaging keeps extractNativeLibs behavior compatible with some plugins.
+            // Do not force keepDebugSymbols here — it can break Flutter’s release strip on Windows/NDK.
             useLegacyPackaging = true
-            keepDebugSymbols.add("**/*.so")
         }
     }
 }

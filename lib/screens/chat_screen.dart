@@ -35,7 +35,6 @@ class _ChatScreenState extends State<ChatScreen> {
       GlobalNotificationManager();
   final List<types.Message> _messages = [];
   late types.User _currentUser;
-  late types.User _otherUser;
   bool _isLoading = true;
   bool _isOtherUserTyping = false;
 
@@ -52,11 +51,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _currentUser = types.User(
       id: widget.currentUserId,
       firstName: widget.currentUserName,
-    );
-
-    _otherUser = types.User(
-      id: widget.otherUser.id,
-      firstName: widget.otherUser.name,
     );
 
     // Connect to socket if not already connected
@@ -286,6 +280,41 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildEmptyState() {
+    return Stack(
+      children: [
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 80,
+                color: Colors.grey[400],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No messages yet',
+                style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Start the conversation!',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(top: false, child: _buildQuickReplies()),
+        ),
+      ],
+    );
+  }
+
   void _handlePreviewDataFetched(
     types.TextMessage message,
     types.PreviewData previewData,
@@ -347,28 +376,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   fontWeight: FontWeight.w400,
                 ),
               ),
-              emptyState: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No messages yet',
-                      style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Start the conversation!',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
-              ),
+              emptyState: _buildEmptyState(),
             ),
     );
   }

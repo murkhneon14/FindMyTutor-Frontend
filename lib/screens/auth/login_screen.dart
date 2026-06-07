@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../../config/theme.dart';
+import '../../config/api.dart';
 import '../../services/auth_service.dart';
+import '../../widgets/otp_four_digit_field.dart';
+import 'signup_step2_screen.dart';
 import '../home/main_navigation.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -19,11 +25,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _otpSent = false;
   String? _verificationId;
-  
-  // OTP controllers
-  final List<TextEditingController> _otpControllers = List.generate(4, (index) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(4, (index) => FocusNode());
-  
+
+  final TextEditingController _otpController = TextEditingController();
+  final FocusNode _otpFocusNode = FocusNode();
+
   int _resendCountdown = 0;
   bool _canResend = false;
   bool _isResending = false;
@@ -31,14 +36,41 @@ class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService();
 
   @override
+  void initState() {
+    super.initState();
+    _otpController.addListener(_onOtpFieldChanged);
+  }
+
+  void _onOtpFieldChanged() {
+    if (!_otpSent || _isLoading || !mounted) return;
+    if (_otpController.text.length == 4) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _otpSent && _otpController.text.length == 4) {
+          _verifyOTP();
+        }
+      });
+    }
+  }
+
+  Future<void> _tryClipboardOtp() async {
+    await Future<void>.delayed(const Duration(milliseconds: 420));
+    if (!mounted || !_otpSent) return;
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final digits = (data?.text ?? '').trim().replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 4) return;
+    _otpController.value = TextEditingValue(
+      text: digits,
+      selection: const TextSelection.collapsed(offset: 4),
+    );
+  }
+
+  @override
   void dispose() {
+    _otpController.removeListener(_onOtpFieldChanged);
     _phoneController.dispose();
-    for (var controller in _otpControllers) {
-      controller.dispose();
-    }
-    for (var node in _focusNodes) {
-      node.dispose();
-    }
+    _otpController.dispose();
+    _otpFocusNode.dispose();
     super.dispose();
   }
 
@@ -99,7 +131,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _verificationId = result['verificationId'] as String?;
       });
       _startResendCountdown();
-      
+      _tryClipboardOtp();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -134,11 +167,8 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       _startResendCountdown();
       
-      // Clear OTP fields
-      for (var controller in _otpControllers) {
-        controller.clear();
-      }
-      
+      _otpController.clear();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -147,6 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
+      _tryClipboardOtp();
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,18 +188,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _verifyOTP() async {
-    for (var controller in _otpControllers) {
-      if (controller.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter the complete OTP')),
-        );
-        return;
-      }
+    if (_isLoading) return;
+    if (_otpController.text.length != 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the complete OTP')),
+      );
+      return;
     }
 
     setState(() => _isLoading = true);
 
-    final otp = _otpControllers.map((c) => c.text).join();
+    final otp = _otpController.text;
     final phone = _phoneController.text.trim();
 
     final result = await _authService.verifyOTPAndAuthenticate(
@@ -188,12 +218,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
       
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (context) => const MainNavigation(initialIndex: 1),
-        ),
-        (route) => false,
-      );
+      // Check if profile is complete before navigating
+      await _checkProfileAndNavigate();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result['error'] ?? 'Verification failed')),
@@ -201,23 +227,74 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _onOTPChange(String value, int index) {
-    if (value.isNotEmpty) {
-      if (index < 3) {
-        _focusNodes[index + 1].requestFocus();
-      } else {
-        _focusNodes[index].unfocus();
-        _verifyOTP();
+  /// After login, check if the user has completed their profile.
+  /// If not, redirect to SignupStep2Screen to finish setup.
+  Future<void> _checkProfileAndNavigate() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      if (token == null) {
+        // Shouldn't happen right after login, but fallback
+        _navigateToMainNavigation();
+        return;
       }
+
+      final response = await http.get(
+        Uri.parse(ApiConfig.me),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final user = data['user'] as Map<String, dynamic>?;
+
+        if (user != null) {
+          final role = user['role']?.toString() ?? 'student';
+          final hasTeacherProfile = user['teacherProfile'] != null;
+          final hasStudentProfile = user['studentProfile'] != null;
+
+          final isProfileComplete =
+              (role == 'teacher' && hasTeacherProfile) ||
+              (role == 'student' && hasStudentProfile);
+
+          if (!isProfileComplete) {
+            debugPrint('⚠️ Profile incomplete after login — redirecting to SignupStep2');
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => SignupStep2Screen(
+                  name: user['name']?.toString() ?? '',
+                  phone: user['phone']?.toString() ?? '',
+                  userType: role,
+                ),
+              ),
+              (route) => false,
+            );
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Profile check failed: $e — proceeding to MainNavigation');
     }
+
+    // Profile is complete or check failed — go to main app
+    _navigateToMainNavigation();
   }
 
-  void _onOTPKeyPress(KeyEvent event, int index) {
-    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
-      if (_otpControllers[index].text.isEmpty && index > 0) {
-        _focusNodes[index - 1].requestFocus();
-      }
-    }
+  void _navigateToMainNavigation() {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (context) => const MainNavigation(initialIndex: 1),
+      ),
+      (route) => false,
+    );
   }
 
   @override
@@ -423,58 +500,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildOTPForm() {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // OTP Input Fields
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(4, (index) {
-            return SizedBox(
-              width: 60,
-              child: KeyboardListener(
-                focusNode: FocusNode(),
-                onKeyEvent: (event) => _onOTPKeyPress(event, index),
-                child: TextFormField(
-                  controller: _otpControllers[index],
-                  focusNode: _focusNodes[index],
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: Theme.of(context).textTheme.titleLarge,
-                  decoration: InputDecoration(
-                    counterText: '',
-                    contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                    filled: true,
-                    fillColor: isDarkMode ? AppTheme.darkCardColor : Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.white24 : Theme.of(context).dividerColor,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: isDarkMode ? Colors.white24 : Theme.of(context).dividerColor,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  onChanged: (value) => _onOTPChange(value, index),
-                ),
-              ),
-            );
-          }),
+        // OTP — full paste + OS SMS autofill
+        OtpFourDigitField(
+          controller: _otpController,
+          focusNode: _otpFocusNode,
+          autofocus: true,
         ),
         const SizedBox(height: 30),
         // Verify Button
