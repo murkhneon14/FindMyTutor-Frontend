@@ -17,6 +17,7 @@ import '../../services/notification_storage_service.dart';
 import '../../services/banner_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../widgets/location_drift_banner.dart';
+import '../../widgets/glossy_3d_button.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -399,6 +400,57 @@ class _ExploreScreenState extends State<ExploreScreen>
     }
   }
 
+  bool _isUserPremium(Map<String, dynamic> item) {
+    try {
+      if (item['isPremium'] == true ||
+          item['is_premium'] == true ||
+          item['isPremiumMember'] == true) {
+        return true;
+      }
+      final user = (item['userId'] is Map)
+          ? item['userId'] as Map
+          : ((item['user'] is Map) ? item['user'] as Map : null);
+
+      if (user != null) {
+        if (user['isPremium'] == true ||
+            user['is_premium'] == true ||
+            user['isPremiumMember'] == true) {
+          return true;
+        }
+        if (user['subscriptionStatus'] == 'active') {
+          return true;
+        }
+        final userSub = user['subscription'];
+        if (userSub is Map && userSub['status'] == 'active') {
+          return true;
+        }
+      }
+
+      if (item['subscriptionStatus'] == 'active') {
+        return true;
+      }
+      final itemSub = item['subscription'];
+      if (itemSub is Map && itemSub['status'] == 'active') {
+        return true;
+      }
+    } catch (e) {
+      print('⚠️ Error in _isUserPremium check: $e');
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _sortResultsByPremium(
+      List<Map<String, dynamic>> results) {
+    results.sort((a, b) {
+      final aPrem = _isUserPremium(a);
+      final bPrem = _isUserPremium(b);
+      if (aPrem && !bPrem) return -1;
+      if (!aPrem && bPrem) return 1;
+      return 0;
+    });
+    return results;
+  }
+
   Future<void> _searchNearbyTeachers() async {
     if (_currentLocation == null) {
       if (mounted) {
@@ -541,8 +593,10 @@ class _ExploreScreenState extends State<ExploreScreen>
           }).toList();
         }
 
+        final sortedTutors = _sortResultsByPremium(filteredTutors);
+
         setState(() {
-          _searchResults = filteredTutors;
+          _searchResults = sortedTutors;
         });
 
         if (mounted) {
@@ -704,8 +758,10 @@ class _ExploreScreenState extends State<ExploreScreen>
           }).toList();
         }
 
+        final sortedStudents = _sortResultsByPremium(filteredStudents);
+
         setState(() {
-          _searchResults = filteredStudents;
+          _searchResults = sortedStudents;
         });
 
         if (filteredStudents.isEmpty && mounted) {
@@ -819,8 +875,10 @@ class _ExploreScreenState extends State<ExploreScreen>
 
               if (mounted) {
                 setState(() {
-                  _searchResults = List<Map<String, dynamic>>.from(
-                    studentsList.cast<Map<String, dynamic>>(),
+                  _searchResults = _sortResultsByPremium(
+                    List<Map<String, dynamic>>.from(
+                      studentsList.cast<Map<String, dynamic>>(),
+                    ),
                   );
                 });
 
@@ -857,8 +915,10 @@ class _ExploreScreenState extends State<ExploreScreen>
 
             if (mounted) {
               setState(() {
-                _searchResults = List<Map<String, dynamic>>.from(
-                  (list as List).cast<Map<String, dynamic>>(),
+                _searchResults = _sortResultsByPremium(
+                  List<Map<String, dynamic>>.from(
+                    (list as List).cast<Map<String, dynamic>>(),
+                  ),
                 );
               });
             }
@@ -918,7 +978,9 @@ class _ExploreScreenState extends State<ExploreScreen>
 
           if (mounted) {
             setState(() {
-              _searchResults = List<Map<String, dynamic>>.from(teachersList);
+              _searchResults = _sortResultsByPremium(
+                List<Map<String, dynamic>>.from(teachersList),
+              );
             });
 
             ScaffoldMessenger.of(context).showSnackBar(
@@ -966,7 +1028,9 @@ class _ExploreScreenState extends State<ExploreScreen>
               final tutors = data['tutors'] ?? data['teachers'] ?? [];
               if (mounted) {
                 setState(() {
-                  _searchResults = List<Map<String, dynamic>>.from(tutors);
+                  _searchResults = _sortResultsByPremium(
+                    List<Map<String, dynamic>>.from(tutors),
+                  );
                 });
               }
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1022,8 +1086,10 @@ class _ExploreScreenState extends State<ExploreScreen>
 
               if (mounted) {
                 setState(() {
-                  _searchResults = List<Map<String, dynamic>>.from(
-                    filtered.cast<Map<String, dynamic>>(),
+                  _searchResults = _sortResultsByPremium(
+                    List<Map<String, dynamic>>.from(
+                      filtered.cast<Map<String, dynamic>>(),
+                    ),
                   );
                 });
               }
@@ -1765,11 +1831,6 @@ class _ExploreScreenState extends State<ExploreScreen>
                                         },
                                         child: const Text('Clear'),
                                       ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(),
-                                        child: const Text('Cancel'),
-                                      ),
                                       ElevatedButton(
                                         onPressed: () {
                                           Navigator.of(context).pop();
@@ -2384,18 +2445,53 @@ class _ExploreScreenState extends State<ExploreScreen>
     final experience = teacher['experience']?.toString() ?? 'N/A';
     final qualifications = teacher['qualifications']?.toString() ?? 'N/A';
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isPremium = _isUserPremium(teacher);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.white,
+        color: isPremium
+            ? (isDarkMode ? const Color(0xFF231F14) : const Color(0xFFFFFDF0))
+            : (isDarkMode ? Colors.grey[800] : Colors.white),
+        gradient: isPremium
+            ? LinearGradient(
+                colors: isDarkMode
+                    ? [const Color(0xFF2E2616), const Color(0xFF1F190D), const Color(0xFF161208)]
+                    : [const Color(0xFFFFFDF5), const Color(0xFFFFF7E6), const Color(0xFFFFF0CC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
         borderRadius: BorderRadius.circular(16),
+        border: isPremium
+            ? Border.all(
+                color: const Color(0xFFFFD700),
+                width: 1.8,
+              )
+            : Border.all(
+                color: isDarkMode ? Colors.white12 : Colors.grey.shade200,
+                width: 1,
+              ),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+          if (isPremium) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withOpacity(0.35),
+              blurRadius: 18,
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ] else ...[
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ],
       ),
       child: Padding(
@@ -2405,33 +2501,114 @@ class _ExploreScreenState extends State<ExploreScreen>
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: isPremium
+                          ? const Color(0xFFFFD700).withOpacity(0.25)
+                          : AppTheme.primaryColor.withOpacity(0.1),
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: isPremium
+                              ? const Color(0xFFD4AF37)
+                              : AppTheme.primaryColor,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (isPremium)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.verified,
+                            color: Color(0xFFFFC107),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode
-                              ? Colors.white
-                              : AppTheme.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode
+                                    ? Colors.white
+                                    : AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (isPremium) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.verified,
+                              color: Color(0xFFFFC107),
+                              size: 20,
+                            ),
+                          ],
+                        ],
                       ),
+                      if (isPremium) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD700).withOpacity(0.4),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.workspace_premium,
+                                size: 12,
+                                color: Colors.black87,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'PREMIUM TUTOR',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black87,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -2497,23 +2674,30 @@ class _ExploreScreenState extends State<ExploreScreen>
               ],
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _handleMessageTeacher(teacher),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (isPremium)
+              Glossy3DButton(
+                label: 'Message',
+                icon: Icons.message,
+                onTap: () => _handleMessageTeacher(teacher),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _handleMessageTeacher(teacher),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.message, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Message',
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
-                icon: const Icon(Icons.message, color: Colors.white, size: 18),
-                label: const Text(
-                  'Message',
-                  style: TextStyle(color: Colors.white),
-                ),
               ),
-            ),
           ],
         ),
       ),
@@ -2672,6 +2856,7 @@ class _ExploreScreenState extends State<ExploreScreen>
             : 'Not specified';
     final guardianName = student['guardianName']?.toString();
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isPremium = _isUserPremium(student);
 
     // Calculate distance if location data is available
     final studentLat = student['latitude'];
@@ -2689,14 +2874,48 @@ class _ExploreScreenState extends State<ExploreScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey[800] : Colors.white,
+        color: isPremium
+            ? (isDarkMode ? const Color(0xFF231F14) : const Color(0xFFFFFDF0))
+            : (isDarkMode ? Colors.grey[800] : Colors.white),
+        gradient: isPremium
+            ? LinearGradient(
+                colors: isDarkMode
+                    ? [const Color(0xFF2E2616), const Color(0xFF1F190D), const Color(0xFF161208)]
+                    : [const Color(0xFFFFFDF5), const Color(0xFFFFF7E6), const Color(0xFFFFF0CC)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
         borderRadius: BorderRadius.circular(16),
+        border: isPremium
+            ? Border.all(
+                color: const Color(0xFFFFD700),
+                width: 1.8,
+              )
+            : Border.all(
+                color: isDarkMode ? Colors.white12 : Colors.grey.shade200,
+                width: 1,
+              ),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+          if (isPremium) ...[
+            BoxShadow(
+              color: const Color(0xFFFFD700).withOpacity(0.35),
+              blurRadius: 18,
+              spreadRadius: 1,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ] else ...[
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ],
       ),
       child: Padding(
@@ -2706,33 +2925,114 @@ class _ExploreScreenState extends State<ExploreScreen>
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                  child: Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryColor,
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: isPremium
+                          ? const Color(0xFFFFD700).withOpacity(0.25)
+                          : AppTheme.primaryColor.withOpacity(0.1),
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: isPremium
+                              ? const Color(0xFFD4AF37)
+                              : AppTheme.primaryColor,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (isPremium)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.verified,
+                            color: Color(0xFFFFC107),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDarkMode
-                              ? Colors.white
-                              : AppTheme.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: isDarkMode
+                                    ? Colors.white
+                                    : AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          if (isPremium) ...[
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.verified,
+                              color: Color(0xFFFFC107),
+                              size: 20,
+                            ),
+                          ],
+                        ],
                       ),
+                      if (isPremium) ...[
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFFD700).withOpacity(0.4),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.workspace_premium,
+                                size: 12,
+                                color: Colors.black87,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'PREMIUM STUDENT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black87,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -2859,23 +3159,30 @@ class _ExploreScreenState extends State<ExploreScreen>
               ],
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _handleMessageStudent(student),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (isPremium)
+              Glossy3DButton(
+                label: 'Message',
+                icon: Icons.message,
+                onTap: () => _handleMessageStudent(student),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _handleMessageStudent(student),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.message, color: Colors.white, size: 18),
+                  label: const Text(
+                    'Message',
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
-                icon: const Icon(Icons.message, color: Colors.white, size: 18),
-                label: const Text(
-                  'Message',
-                  style: TextStyle(color: Colors.white),
-                ),
               ),
-            ),
           ],
         ),
       ),
